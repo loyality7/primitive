@@ -18,6 +18,8 @@ type Worker struct {
 	Rnd        *rand.Rand
 	Score      float64
 	Counter    int
+	Edge       *EdgeMap // nil = uniform placement
+	EdgeBias   float64  // chance a new shape is anchored by Edge instead of uniformly
 }
 
 func NewWorker(target *image.RGBA, seed int64) *Worker {
@@ -104,4 +106,25 @@ func (worker *Worker) RandomState(t ShapeType, a int) *State {
 	case ShapeTypePolygon:
 		return NewState(worker, NewRandomPolygon(worker, 4, false), a)
 	}
+}
+
+// RandomPoint picks where a new random shape is anchored. With no edge map it
+// is uniform and consumes the RNG exactly as before.
+func (worker *Worker) RandomPoint() (int, int) {
+	rnd := worker.Rnd
+	if worker.Edge != nil && rnd.Float64() < worker.EdgeBias {
+		return worker.Edge.Sample(rnd)
+	}
+	x := rnd.Intn(worker.W)
+	return x, rnd.Intn(worker.H)
+}
+
+func (worker *Worker) RandomPointF() (float64, float64) {
+	rnd := worker.Rnd
+	if worker.Edge != nil && rnd.Float64() < worker.EdgeBias {
+		x, y := worker.Edge.Sample(rnd)
+		return float64(x) + rnd.Float64(), float64(y) + rnd.Float64()
+	}
+	x := rnd.Float64() * float64(worker.W)
+	return x, rnd.Float64() * float64(worker.H)
 }

@@ -16,8 +16,7 @@ type Triangle struct {
 
 func NewRandomTriangle(worker *Worker) *Triangle {
 	rnd := worker.Rnd
-	x1 := rnd.Intn(worker.W)
-	y1 := rnd.Intn(worker.H)
+	x1, y1 := worker.RandomPoint()
 	x2 := x1 + rnd.Intn(31) - 15
 	y2 := y1 + rnd.Intn(31) - 15
 	x3 := x1 + rnd.Intn(31) - 15

@@ -18,8 +18,7 @@ type Quadratic struct {
 
 func NewRandomQuadratic(worker *Worker) *Quadratic {
 	rnd := worker.Rnd
-	x1 := rnd.Float64() * float64(worker.W)
-	y1 := rnd.Float64() * float64(worker.H)
+	x1, y1 := worker.RandomPointF()
 	x2 := x1 + rnd.Float64()*40 - 20
 	y2 := y1 + rnd.Float64()*40 - 20
 	x3 := x2 + rnd.Float64()*40 - 20

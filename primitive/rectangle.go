@@ -15,8 +15,7 @@ type Rectangle struct {
 
 func NewRandomRectangle(worker *Worker) *Rectangle {
 	rnd := worker.Rnd
-	x1 := rnd.Intn(worker.W)
-	y1 := rnd.Intn(worker.H)
+	x1, y1 := worker.RandomPoint()
 	x2 := clampInt(x1+rnd.Intn(32)+1, 0, worker.W-1)
 	y2 := clampInt(y1+rnd.Intn(32)+1, 0, worker.H-1)
 	return &Rectangle{worker, x1, y1, x2, y2}
@@ -86,8 +85,7 @@ type RotatedRectangle struct {
 
 func NewRandomRotatedRectangle(worker *Worker) *RotatedRectangle {
 	rnd := worker.Rnd
-	x := rnd.Intn(worker.W)
-	y := rnd.Intn(worker.H)
+	x, y := worker.RandomPoint()
 	sx := rnd.Intn(32) + 1
 	sy := rnd.Intn(32) + 1
 	a := rnd.Intn(360)

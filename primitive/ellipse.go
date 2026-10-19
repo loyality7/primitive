@@ -17,8 +17,7 @@ type Ellipse struct {
 
 func NewRandomEllipse(worker *Worker) *Ellipse {
 	rnd := worker.Rnd
-	x := rnd.Intn(worker.W)
-	y := rnd.Intn(worker.H)
+	x, y := worker.RandomPoint()
 	rx := rnd.Intn(32) + 1
 	ry := rnd.Intn(32) + 1
 	return &Ellipse{worker, x, y, rx, ry, false}
@@ -26,8 +25,7 @@ func NewRandomEllipse(worker *Worker) *Ellipse {
 
 func NewRandomCircle(worker *Worker) *Ellipse {
 	rnd := worker.Rnd
-	x := rnd.Intn(worker.W)
-	y := rnd.Intn(worker.H)
+	x, y := worker.RandomPoint()
 	r := rnd.Intn(32) + 1
 	return &Ellipse{worker, x, y, r, r, true}
 }
@@ -108,8 +106,7 @@ type RotatedEllipse struct {
 
 func NewRandomRotatedEllipse(worker *Worker) *RotatedEllipse {
 	rnd := worker.Rnd
-	x := rnd.Float64() * float64(worker.W)
-	y := rnd.Float64() * float64(worker.H)
+	x, y := worker.RandomPointF()
 	rx := rnd.Float64()*32 + 1
 	ry := rnd.Float64()*32 + 1
 	a := rnd.Float64() * 360

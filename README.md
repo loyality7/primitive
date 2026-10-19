@@ -40,6 +40,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `seed` | random | RNG seed, for reproducible output (use with `-j 1`) |
 | `int` | 50 | frame interval for GIF output |
 | `anim` | 0 | animate SVG output: seconds between shapes appearing (0 = static) |
+| `edge` | 0 | 0-1: chance a new shape is anchored near high-detail areas (Sobel edges). Off by default. Measured gain is small: about 1% lower error in detailed regions, none overall. |
 | `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
 | `v` | off | verbose output |
 | `vv` | off | very verbose output |

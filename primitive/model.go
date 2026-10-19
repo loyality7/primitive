@@ -189,3 +189,15 @@ func (model *Model) runWorkers(t ShapeType, a, n, age, m int) *State {
 func (model *Model) runWorker(worker *Worker, t ShapeType, a, n, age, m int, ch chan *State) {
 	ch <- worker.BestHillClimbState(t, a, n, age, m)
 }
+
+// SetEdgeBias makes new random shapes anchor near high-contrast areas of the
+// target with the given probability (0 = off, 1 = always).
+func (model *Model) SetEdgeBias(bias float64) {
+	if bias <= 0 {
+		return
+	}
+	edge := NewEdgeMap(model.Target)
+	for _, w := range model.Workers {
+		w.Edge, w.EdgeBias = edge, bias
+	}
+}

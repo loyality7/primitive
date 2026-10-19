@@ -34,6 +34,7 @@ var (
 	Interval   int
 	Anim       float64
 	Palette    string
+	Edge       float64
 )
 
 var hexColor = regexp.MustCompile(`^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
@@ -87,6 +88,7 @@ func init() {
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
 	flag.Float64Var(&Anim, "anim", 0, "animate SVG output: seconds between shapes appearing (0 = static)")
+	flag.Float64Var(&Edge, "edge", 0, "0-1: chance a shape is placed near high-detail areas (0 = uniform)")
 	flag.StringVar(&Palette, "palette", "", "restrict colors to comma-separated hex list, e.g. \"#000000,#ff0000,#ffffff\"")
 	flag.IntVar(&Interval, "int", 50, "interval between frame in a gif")
 }
@@ -187,6 +189,7 @@ func main() {
 	// run algorithm
 	model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
 	model.AnimStep = Anim
+	model.SetEdgeBias(Edge)
 	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
 	start := time.Now()
 	frame := 0
