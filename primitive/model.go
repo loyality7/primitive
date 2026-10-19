@@ -135,7 +135,6 @@ func (model *Model) Add(shape Shape, alpha int) {
 
 func (model *Model) Step(shapeType ShapeType, alpha, repeat int) int {
 	state := model.runWorkers(shapeType, alpha, 1000, 100, 16)
-	// state = HillClimb(state, 1000).(*State)
 	model.Add(state.Shape, state.Alpha)
 
 	for i := 0; i < repeat; i++ {
@@ -148,11 +147,6 @@ func (model *Model) Step(shapeType ShapeType, alpha, repeat int) int {
 		}
 		model.Add(state.Shape, state.Alpha)
 	}
-
-	// for _, w := range model.Workers[1:] {
-	// 	model.Workers[0].Heatmap.AddHeatmap(w.Heatmap)
-	// }
-	// SavePNG("heatmap.png", model.Workers[0].Heatmap.Image(0.5))
 
 	counter := 0
 	for _, worker := range model.Workers {

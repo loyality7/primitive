@@ -15,6 +15,12 @@ Original on the left, result on the right.
 | <img src="examples/lenna.png" width="256"/> | <img src="docs/lenna-rotated-rects.png" width="256"/><br>200 rotated rectangles (`-m 5`) |
 | <img src="examples/pyramids.png" width="256"/> | <img src="docs/pyramids-polygons.png" width="256"/><br>200 polygons (`-m 8`) |
 
+### Animated SVG
+
+`-anim 0.08 -o out.svg` makes an SVG where each shape fades in after the previous one. Open the file in a browser to watch the picture build.
+
+<img src="docs/monalisa-anim.svg" width="360"/>
+
 ### Command-line Usage
 
 Run it on your own images! First, [install Go](https://golang.org/doc/install).

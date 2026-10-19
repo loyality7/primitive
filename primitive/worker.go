@@ -14,7 +14,6 @@ type Worker struct {
 	Buffer     *image.RGBA
 	Rasterizer *raster.Rasterizer
 	Lines      []Scanline
-	Heatmap    *Heatmap
 	Rnd        *rand.Rand
 	Score      float64
 	Counter    int
@@ -32,7 +31,6 @@ func NewWorker(target *image.RGBA, seed int64) *Worker {
 	worker.Buffer = image.NewRGBA(target.Bounds())
 	worker.Rasterizer = raster.NewRasterizer(w, h)
 	worker.Lines = make([]Scanline, 0, 4096) // TODO: based on height
-	worker.Heatmap = NewHeatmap(w, h)
 	worker.Rnd = rand.New(rand.NewSource(seed))
 	return &worker
 }
@@ -41,13 +39,11 @@ func (worker *Worker) Init(current *image.RGBA, score float64) {
 	worker.Current = current
 	worker.Score = score
 	worker.Counter = 0
-	worker.Heatmap.Clear()
 }
 
 func (worker *Worker) Energy(shape Shape, alpha int) float64 {
 	worker.Counter++
 	lines := shape.Rasterize()
-	// worker.Heatmap.Add(lines)
 	color := computeColor(worker.Target, worker.Current, lines, alpha)
 	copyLines(worker.Buffer, worker.Current, lines)
 	drawLines(worker.Buffer, color, lines)
