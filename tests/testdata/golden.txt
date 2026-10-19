@@ -11,5 +11,9 @@ edge|-m 3 -edge 0.6|d83947bc958815031e2079b3d9262ce9d94ac93ac6ffa4cdd2bc610abfea
 palette|-m 1 -a 0 -palette #101010,#e8d9a0,#c0392b,#2d5a27|dc4b1884be40346f47e1889fc3769a134b9fe6d0ac7575d5d08b1aff11fd5d58
 blur-anim|-m 1 -blur 2 -anim 0.05|a1086d6655f2faedf977f546ccac157492e1e050dd55557c0bb5b4f89907c47e
 repeat|-m 1 -rep 2|f89b34cb5544cae4c046be3abbffda2ee1dda408b962def0b25da92995e19cd4
-quads|-algo quads|56d434f8531ca37dc766656da97d4fd4e9b41063cbddb832ddb325d892c8bb47
-quads-r128|-algo quads -r 128|3a3733f5b440af53514b835f80cb0f188bb35c8d2ade928c7fefce523fa77048
+quads|-algo quads|8caaf0e2147186a3c2e1c443216169bd27fc07b0e8ada786deeb361db0655fea
+quads-r128|-algo quads -r 128|00557284571b1823817e81291e30c03e09d4779f2922889ea971fd34814a32b1
+quads-noborder|-algo quads -border 0|56d434f8531ca37dc766656da97d4fd4e9b41063cbddb832ddb325d892c8bb47
+quads-circles|-algo quads -cell circle|1864b837883f0b1d1741bd3db6589681f2e1e65e21ad25370a84abfcac08fee0
+quads-anim|-algo quads -anim 0.01|de743772c9dadb4671be777cee0e49b44544db419e33de77ec9f756f1ba599bd
+quads-circles-anim|-algo quads -cell circle -anim 0.01|77a91c8f91966d8c937c06fb7804704ff26e0a6c699d48baf10c618306e85d79

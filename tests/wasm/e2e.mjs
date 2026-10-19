@@ -121,6 +121,10 @@ test("quads: init, split, pixels, svg and png", () => {
   const svg = P.svg(0, 0);
   assert.equal((svg.match(/<rect/g) || []).length, 151);
   assert.match(svg, /viewBox="0 0 128 128"/);
+  assert.ok(!svg.includes("animation-delay"));
+  const anim = P.svg(0.01, 0);
+  assert.equal((anim.match(/<rect/g) || []).length, 1 + 4 * 50);
+  assert.match(anim, /animation-delay:0\.500s/);
   assert.deepEqual([...P.png().slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
 });
 
@@ -131,6 +135,35 @@ test("quads: more splits lower the error and it eventually finishes", () => {
   assert.ok(b.score < a);
   assert.equal(P.stepQuads(1).finished, true);
   assert.equal(b.score, 0, "fully split image must be exact");
+});
+
+test("quads: outlines are the default and can be turned off", () => {
+  const black = (px, x, y, w) => px[(y * w + x) * 4] + px[(y * w + x) * 4 + 1] + px[(y * w + x) * 4 + 2] === 0;
+  P.initQuads(owl, 128, 128);
+  P.stepQuads(30);
+  assert.ok(black(P.pixels(), 0, 0, 128), "default: the corner is part of an outline");
+  assert.match(P.svg(0, 0), /stroke-width:1/);
+  P.initQuads(owl, 128, 128, 0, false);
+  P.stepQuads(30);
+  assert.ok(!black(P.pixels(), 0, 0, 128) || !black(P.pixels(), 1, 1, 128), "border 0: plain squares");
+  assert.ok(!P.svg(0, 0).includes("stroke"));
+  P.initQuads(owl, 128, 128, 4, false);
+  P.stepQuads(30);
+  assert.match(P.svg(0, 0), /stroke-width:4/);
+});
+
+test("quads: circles on black, static and animated", () => {
+  const r = P.initQuads(owl, 128, 128, 1, true);
+  assert.equal(r.error, undefined);
+  const s = P.stepQuads(40);
+  const svg = P.svg(0, 0);
+  assert.equal((svg.match(/<circle/g) || []).length, s.leaves);
+  assert.ok(svg.includes('fill="#000"') && !svg.includes("crispEdges"));
+  const px = P.pixels();
+  assert.equal(px[0] + px[1] + px[2], 0, "the corner of the picture is black background");
+  const anim = P.svg(0.01, 0);
+  assert.equal((anim.match(/<circle/g) || []).length, 1 + 4 * 40);
+  assert.ok(anim.includes('class="c"') && anim.includes('class="b"') && anim.includes('class="a"'));
 });
 
 test("quads: bad image bytes are rejected", () => {

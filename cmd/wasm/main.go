@@ -88,7 +88,7 @@ func initModel(_ js.Value, args []js.Value) any {
 	return map[string]any{"width": model.Sw, "height": model.Sh}
 }
 
-// initQuads(bytes, workingSize, outputSize) -> {width, height, leaves} | {error}
+// initQuads(bytes, workingSize, outputSize[, border, circles]) -> {width, height, leaves} | {error}
 func initQuads(_ js.Value, args []js.Value) any {
 	if len(args) < 3 {
 		return fail("initQuads needs 3 arguments")
@@ -99,6 +99,12 @@ func initQuads(_ js.Value, args []js.Value) any {
 	}
 	model = nil
 	qmodel = quad.NewModel(img, args[2].Int())
+	if len(args) >= 4 {
+		qmodel.Border = args[3].Int()
+	}
+	if len(args) >= 5 {
+		qmodel.Circles = args[4].Truthy()
+	}
 	return map[string]any{"width": qmodel.Sw, "height": qmodel.Sh, "leaves": qmodel.Leaves()}
 }
 
@@ -137,9 +143,10 @@ func pixels(_ js.Value, _ []js.Value) any {
 	return toJS(dst.Pix)
 }
 
-// svg(animSeconds, blur) -> string. The two options only apply to shapes.
+// svg(animSeconds, blur) -> string. Blur only applies to shapes.
 func svg(_ js.Value, args []js.Value) any {
 	if qmodel != nil {
+		qmodel.AnimStep = args[0].Float()
 		return qmodel.SVG()
 	}
 	if model == nil || len(model.Shapes) == 0 {

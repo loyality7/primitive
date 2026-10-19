@@ -78,6 +78,7 @@
       <select id="algo">
         <option value="shapes">Shapes</option>
         <option value="quads">Squares (quadtree)</option>
+        <option value="circles">Circles (quadtree)</option>
       </select>
 
       <div id="shapeOnly">
@@ -95,6 +96,8 @@
       </select>
 
       </div>
+
+      <div class="check" id="outlineRow" hidden><input id="outline" type="checkbox" checked><label for="outline" style="margin:0;color:inherit">Outline each square</label></div>
 
       <label for="count" id="countLabel">Number of shapes</label>
       <input id="count" type="number" min="10" max="1000" value="150">
@@ -137,7 +140,7 @@
         <button id="dlanim" type="button" disabled>Animated SVG</button>
         <button id="dlpng" type="button" disabled>Download PNG</button>
       </div>
-      <p class="hint">Animated SVG: open the file in a browser and the shapes fade in one by one.</p>
+      <p class="hint">Animated SVG: open the file in a browser and the picture builds up one piece at a time.</p>
     </section>
   </div>
 
@@ -155,7 +158,8 @@ let running = false;
 let done = 0, target = 0, size = { w: OUT, h: OUT };
 let msTotal = 0;
 let leaves = 1;          // quads: squares drawn so far
-const quads = () => $("algo").value === "quads";
+const quads = () => $("algo").value !== "shapes"; // squares or circles
+const circles = () => $("algo").value === "circles";
 
 const ctx = $("canvas").getContext("2d");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -182,8 +186,7 @@ function refresh() {
   $("reset").disabled = !started;
   const has = started && done > 0;
   for (const id of ["dlsvg", "dlanim", "dlpng"]) $(id).disabled = !has;
-  if (quads()) $("dlanim").disabled = true; // the fade-in animation is for shapes
-  for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "sample"]) $(id).disabled = started;
+  for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "outline", "sample"]) $(id).disabled = started;
   $("drop").style.pointerEvents = started ? "none" : "";
   $("drop").style.opacity = started ? .5 : 1;
 }
@@ -225,7 +228,7 @@ async function takePhoto(file) {
 async function begin() {
   let r;
   if (quads()) {
-    r = P.initQuads(imageBytes, Number($("detail").value), OUT);
+    r = P.initQuads(imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, circles());
   } else {
     const [cand, rest] = $("effort").value.split(",").map(Number);
     r = P.init(imageBytes, Number($("detail").value), OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest);
@@ -281,7 +284,9 @@ function save(name, data, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function saveSVG(anim) {
-  const svg = P.svg(anim ? 0.06 : 0, 0);
+  // shapes: 0.06 s apart. squares have far more splits, so fit them in about 8 seconds.
+  const step = quads() ? Math.max(0.002, Math.min(0.06, 8 / Math.max(1, done))) : 0.06;
+  const svg = P.svg(anim ? step : 0, 0);
   if (typeof svg !== "string") return setError(svg.error || "Nothing to export yet.");
   save(anim ? "primitive-animated.svg" : "primitive.svg", svg, "image/svg+xml");
 }
@@ -296,6 +301,7 @@ $("dlpng").onclick = () => {
 function applyStyle() {
   const q = quads();
   $("shapeOnly").hidden = $("shapeOnly2").hidden = q;
+  $("outlineRow").hidden = $("algo").value !== "quads";
   $("countLabel").textContent = q ? "Number of splits" : "Number of shapes";
   $("count").max = q ? 20000 : 1000;
   $("count").value = q ? 1500 : 150;
