@@ -18,6 +18,8 @@ type Model struct {
 	AnimStep       float64        // seconds between shapes in SVG output, 0 = static
 	Palette        []colors.Color // restricts shape colors when non-empty
 	Blur           float64        // SVG-only gaussian blur radius in image pixels, 0 = off
+	Candidates     int            // random shapes tried per hill-climb restart, default 1000
+	Restarts       int            // hill-climb restarts per step, default 16
 	Scale          float64
 	Background     colors.Color
 	Target         *image.RGBA
@@ -57,6 +59,7 @@ func NewModel(target image.Image, background colors.Color, size, numWorkers int,
 	model.Current = imageio.UniformRGBA(target.Bounds(), background.NRGBA())
 	model.Score = differenceFull(model.Target, model.Current)
 	model.Context = model.newContext()
+	model.Candidates, model.Restarts = 1000, 16
 	for i := 0; i < numWorkers; i++ {
 		worker := NewWorker(model.Target, seed+int64(i))
 		model.Workers = append(model.Workers, worker)
@@ -145,7 +148,7 @@ func (model *Model) Add(sh shape.Shape, alpha int) {
 }
 
 func (model *Model) Step(shapeType shape.Type, alpha, repeat int) int {
-	state := model.runWorkers(shapeType, alpha, 1000, 100, 16)
+	state := model.runWorkers(shapeType, alpha, model.Candidates, 100, model.Restarts)
 	model.Add(state.Shape, state.Alpha)
 
 	for i := 0; i < repeat; i++ {
@@ -213,5 +216,16 @@ func (model *Model) SetPalette(palette []colors.Color) {
 	model.Palette = palette
 	for _, w := range model.Workers {
 		w.Palette = palette
+	}
+}
+
+// SetEffort sets how hard each step searches. Lower values are faster and a
+// little less accurate. The defaults are 1000 candidates and 16 restarts.
+func (model *Model) SetEffort(candidates, restarts int) {
+	if candidates > 0 {
+		model.Candidates = candidates
+	}
+	if restarts > 0 {
+		model.Restarts = restarts
 	}
 }

@@ -58,6 +58,18 @@ Small input images should be used (like 256x256px). You don't need the detail an
 
 Tip: for detail, such as the curve of a smile, raise the shape count and the working resolution: `-n 400 -r 512` cut the error in a face region by about 27% compared with `-n 150 -r 256` on the Mona Lisa example, and took about 27 seconds. Triangles (`-m 1`) and rotated ellipses (`-m 7`) were about equally accurate at those settings; triangles gave a sharp low-poly look and ran 2x faster, ellipses a softer look.
 
+### Web version
+
+`web/index.html` runs the same engine in the browser through WebAssembly: pick a photo, watch the shapes appear, download SVG or PNG. Nothing is uploaded. Build the engine once, then serve the `web/` folder with any static file server:
+
+```
+GOOS=js GOARCH=wasm go build -o web/primitive.wasm ./cmd/wasm
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/
+python -m http.server 8000     # then open http://localhost:8000/web/
+```
+
+Hosting it needs only `index.html`, `wasm_exec.js` and `primitive.wasm`; Go is not needed on the server. The browser build uses one thread, so it is slower than the command line. The `tests/wasm/` scripts check it end to end in Node (`node tests/wasm/e2e.mjs`).
+
 ### Project layout
 
 ```
