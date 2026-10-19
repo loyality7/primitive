@@ -4,6 +4,17 @@
 
 A target image is provided as input. The algorithm tries to find the single most optimal shape that can be drawn to minimize the error between the target image and the drawn image. It repeats this process, adding *one shape at a time*. Around 50 to 200 shapes are needed to reach a result that is recognizable yet artistic and abstract.
 
+### Examples
+
+Original on the left, result on the right.
+
+| Original | Result |
+| --- | --- |
+| <img src="examples/monalisa.png" width="256"/> | <img src="docs/monalisa-triangles.png" width="256"/><br>200 triangles (`-m 1`) |
+| <img src="examples/owl.png" width="256"/> | <img src="docs/owl-ellipses.png" width="256"/><br>250 ellipses (`-m 3`) |
+| <img src="examples/lenna.png" width="256"/> | <img src="docs/lenna-rotated-rects.png" width="256"/><br>200 rotated rectangles (`-m 5`) |
+| <img src="examples/pyramids.png" width="256"/> | <img src="docs/pyramids-polygons.png" width="256"/><br>200 polygons (`-m 8`) |
+
 ### Command-line Usage
 
 Run it on your own images! First, [install Go](https://golang.org/doc/install).
