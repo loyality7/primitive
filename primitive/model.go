@@ -41,8 +41,8 @@ func NewModel(target image.Image, background Color, size, numWorkers int, seed i
 	model := &Model{}
 	model.Sw = sw
 	model.Sh = sh
-	model.Vw = sw / int(scale)
-	model.Vh = sh / int(scale)
+	model.Vw = w
+	model.Vh = h
 	model.Scale = scale
 	model.Background = background
 	model.Target = imageToRGBA(target)
@@ -50,7 +50,7 @@ func NewModel(target image.Image, background Color, size, numWorkers int, seed i
 	model.Score = differenceFull(model.Target, model.Current)
 	model.Context = model.newContext()
 	for i := 0; i < numWorkers; i++ {
-		worker := NewWorker(model.Target, seed)
+		worker := NewWorker(model.Target, seed+int64(i))
 		model.Workers = append(model.Workers, worker)
 	}
 	return model
@@ -91,7 +91,7 @@ func (model *Model) SVG() string {
 	var lines []string
 	lines = append(lines, fmt.Sprintf("<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"0 0 %d %d\">", model.Vw, model.Vh))
 	lines = append(lines, fmt.Sprintf("<rect width=\"100%%\" height=\"100%%\" fill=\"#%02x%02x%02x\" />", bg.R, bg.G, bg.B))
-	group := "<g fill-opacity=\"%f\">"
+	group := "<g transform=\"translate(0.5 0.5)\" fill-opacity=\"%f\">"
 	lines = append(lines, fmt.Sprintf(group, float64(fillA)/255))
 	for i, shape := range model.Shapes {
 		var attrs []string
