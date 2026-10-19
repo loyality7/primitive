@@ -4,21 +4,48 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
+var (
+	cliOnce sync.Once
+	cliDir  string
+	cliBin  string
+	cliErr  error
+)
+
+// buildCLI builds the command line tool once for all tests and returns the
+// binary and a directory the tests may write into.
 func buildCLI(t *testing.T) (bin, dir string) {
 	t.Helper()
-	dir = t.TempDir()
-	bin = filepath.Join(dir, "primitive.exe")
-	if out, err := exec.Command("go", "build", "-o", bin, "../cmd/primitive").CombinedOutput(); err != nil {
-		t.Fatalf("build failed: %v\n%s", err, out)
+	cliOnce.Do(func() {
+		cliDir, cliErr = os.MkdirTemp("", "primitive-cli-")
+		if cliErr != nil {
+			return
+		}
+		cliBin = filepath.Join(cliDir, "primitive.exe")
+		if out, err := exec.Command("go", "build", "-o", cliBin, "../cmd/primitive").CombinedOutput(); err != nil {
+			cliErr = fmt.Errorf("build failed: %v\n%s", err, out)
+		}
+	})
+	if cliErr != nil {
+		t.Fatal(cliErr)
 	}
-	return bin, dir
+	return cliBin, cliDir
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if cliDir != "" {
+		os.RemoveAll(cliDir)
+	}
+	os.Exit(code)
 }
 
 // TestGoldenOutputs runs the real CLI with a fixed seed and one worker and
@@ -39,6 +66,7 @@ func TestGoldenOutputs(t *testing.T) {
 		}
 		name, args, want := parts[0], strings.Fields(parts[1]), parts[2]
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			out := filepath.Join(dir, name+".svg")
 			base := []string{"-i", "../examples/owl.png", "-o", out, "-n", "15", "-j", "1", "-seed", "5"}
 			if strings.Contains(parts[1], "-algo quads") { // quads takes no seed or worker count
