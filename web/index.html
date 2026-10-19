@@ -271,9 +271,9 @@ drop.ondragleave = () => drop.classList.remove("over");
 drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) takePhoto(e.dataTransfer.files[0]); };
 $("sample").onclick = async () => {
   try {
-    const res = await fetch("../examples/owl.png");
+    const res = await fetch("sample.jpg");
     if (!res.ok) throw new Error();
-    takePhoto(new File([await res.blob()], "sample owl.png"));
+    takePhoto(new File([await res.blob()], "sample owl.jpg"));
   } catch { setError("The sample photo is not available here. Choose your own photo."); }
 };
 
