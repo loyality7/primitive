@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -34,6 +35,8 @@ var (
 	Anim       float64
 	Palette    string
 )
+
+var hexColor = regexp.MustCompile(`^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 
 type flagArray []string
 
@@ -148,7 +151,12 @@ func main() {
 	// color palette
 	if Palette != "" {
 		for _, h := range strings.Split(Palette, ",") {
-			primitive.Palette = append(primitive.Palette, primitive.MakeHexColor(strings.TrimSpace(h)))
+			h = strings.TrimSpace(h)
+			if !hexColor.MatchString(h) {
+				fmt.Fprintf(os.Stderr, "ERROR: invalid palette color %q (want #rgb or #rrggbb)\n", h)
+				os.Exit(1)
+			}
+			primitive.Palette = append(primitive.Palette, primitive.MakeHexColor(h))
 		}
 	}
 
