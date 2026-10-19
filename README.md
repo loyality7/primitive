@@ -1,5 +1,7 @@
 # Primitive Pictures
 
+> **Credit.** This project is based on [primitive](https://github.com/fogleman/primitive) by [Michael Fogleman](https://github.com/fogleman), released under the MIT license (see [LICENSE.md](LICENSE.md)). The core algorithm and the original code are his. The idea was inspired by Roger Johansson's [Genetic Programming: Evolution of Mona Lisa](https://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/).
+
 ### How it Works
 
 A target image is provided as input. The algorithm tries to find the single most optimal shape that can be drawn to minimize the error between the target image and the drawn image. It repeats this process, adding *one shape at a time*. Around 50 to 200 shapes are needed to reach a result that is recognizable yet artistic and abstract.
