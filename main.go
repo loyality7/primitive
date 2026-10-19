@@ -31,6 +31,8 @@ var (
 	Seed       int64
 	V, VV      bool
 	Interval   int
+	Anim       float64
+	Palette    string
 )
 
 type flagArray []string
@@ -81,6 +83,8 @@ func init() {
 	})
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
+	flag.Float64Var(&Anim, "anim", 0, "animate SVG output: seconds between shapes appearing (0 = static)")
+	flag.StringVar(&Palette, "palette", "", "restrict colors to comma-separated hex list, e.g. \"#000000,#ff0000,#ffffff\"")
 	flag.IntVar(&Interval, "int", 50, "interval between frame in a gif")
 }
 
@@ -141,6 +145,13 @@ func main() {
 	}
 	rand.Seed(Seed)
 
+	// color palette
+	if Palette != "" {
+		for _, h := range strings.Split(Palette, ",") {
+			primitive.Palette = append(primitive.Palette, primitive.MakeHexColor(strings.TrimSpace(h)))
+		}
+	}
+
 	// determine worker count
 	if Workers < 1 {
 		Workers = runtime.NumCPU()
@@ -167,9 +178,14 @@ func main() {
 
 	// run algorithm
 	model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
+	model.AnimStep = Anim
 	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
 	start := time.Now()
 	frame := 0
+	total := 0
+	for _, config := range Configs {
+		total += config.Count
+	}
 	for j, config := range Configs {
 		primitive.Log(1, "count=%d, mode=%d, alpha=%d, repeat=%d\n",
 			config.Count, config.Mode, config.Alpha, config.Repeat)
@@ -183,6 +199,10 @@ func main() {
 			nps := primitive.NumberString(float64(n) / time.Since(t).Seconds())
 			elapsed := time.Since(start).Seconds()
 			primitive.Log(1, "%d: t=%.3f, score=%.6f, n=%d, n/s=%s\n", frame, elapsed, model.Score, n, nps)
+
+			if !V && !VV {
+				progress(frame, total, start)
+			}
 
 			// write output image(s)
 			for _, output := range Outputs {
@@ -216,5 +236,19 @@ func main() {
 				}
 			}
 		}
+	}
+}
+
+// progress draws a one-line progress bar with ETA on stderr.
+func progress(done, total int, start time.Time) {
+	const width = 30
+	filled := width * done / total
+	eta := time.Duration(0)
+	if done > 0 {
+		eta = time.Duration(float64(time.Since(start)) / float64(done) * float64(total-done))
+	}
+	fmt.Fprintf(os.Stderr, "[%s%s] %d/%d  eta %s ", strings.Repeat("#", filled), strings.Repeat(".", width-filled), done, total, eta.Round(time.Second))
+	if done == total {
+		fmt.Fprintln(os.Stderr)
 	}
 }

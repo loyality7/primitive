@@ -39,6 +39,8 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `j` | 0 | number of parallel workers (default uses all cores) |
 | `seed` | random | RNG seed, for reproducible output (use with `-j 1`) |
 | `int` | 50 | frame interval for GIF output |
+| `anim` | 0 | animate SVG output: seconds between shapes appearing (0 = static) |
+| `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
 | `v` | off | verbose output |
 | `vv` | off | very verbose output |
 | `int` | 50 | interval between frame in a gif in millis (works only with .gif output)|

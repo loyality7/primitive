@@ -10,6 +10,7 @@ import (
 
 type Model struct {
 	Sw, Sh, Vw, Vh int
+	AnimStep       float64 // seconds between shapes in SVG output, 0 = static
 	Scale          float64
 	Background     Color
 	Target         *image.RGBA
@@ -91,6 +92,9 @@ func (model *Model) SVG() string {
 	var lines []string
 	lines = append(lines, fmt.Sprintf("<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"0 0 %d %d\">", model.Vw, model.Vh))
 	lines = append(lines, fmt.Sprintf("<rect width=\"100%%\" height=\"100%%\" fill=\"#%02x%02x%02x\" />", bg.R, bg.G, bg.B))
+	if model.AnimStep > 0 {
+		lines = append(lines, "<style>.a{opacity:0;animation:p .25s ease-out forwards}@keyframes p{to{opacity:1}}</style>")
+	}
 	group := "<g transform=\"translate(0.5 0.5)\" fill-opacity=\"%f\">"
 	lines = append(lines, fmt.Sprintf(group, float64(fillA)/255))
 	for i, shape := range model.Shapes {
@@ -102,6 +106,9 @@ func (model *Model) SVG() string {
 		if c.A != fillA {
 			opacity := "fill-opacity=\"%f\""
 			attrs = append(attrs, fmt.Sprintf(opacity, float64(c.A)/255))
+		}
+		if model.AnimStep > 0 {
+			attrs = append(attrs, fmt.Sprintf("class=\"a\" style=\"animation-delay:%.3fs\"", float64(i)*model.AnimStep))
 		}
 		lines = append(lines, shape.SVG(strings.Join(attrs, " ")))
 	}

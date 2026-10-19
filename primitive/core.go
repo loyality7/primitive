@@ -30,7 +30,25 @@ func computeColor(target, current *image.RGBA, lines []Scanline, alpha int) Colo
 	r := clampInt(int(rsum/count)>>8, 0, 255)
 	g := clampInt(int(gsum/count)>>8, 0, 255)
 	b := clampInt(int(bsum/count)>>8, 0, 255)
-	return Color{r, g, b, alpha}
+	return snapToPalette(Color{r, g, b, alpha})
+}
+
+// Palette, when non-empty, restricts every shape color to its nearest entry.
+var Palette []Color
+
+func snapToPalette(c Color) Color {
+	if len(Palette) == 0 {
+		return c
+	}
+	best, bestD := Palette[0], -1
+	for _, p := range Palette {
+		dr, dg, db := p.R-c.R, p.G-c.G, p.B-c.B
+		if d := dr*dr + dg*dg + db*db; bestD < 0 || d < bestD {
+			best, bestD = p, d
+		}
+	}
+	best.A = c.A
+	return best
 }
 
 func copyLines(dst, src *image.RGBA, lines []Scanline) {
