@@ -139,8 +139,9 @@
         <button id="dlsvg" type="button" disabled>Download SVG</button>
         <button id="dlanim" type="button" disabled>Animated SVG</button>
         <button id="dlpng" type="button" disabled>Download PNG</button>
+        <button id="dlgif" type="button" disabled>Download GIF</button>
       </div>
-      <p class="hint">Animated SVG: open the file in a browser and the picture builds up one piece at a time.</p>
+      <p class="hint">Animated SVG: open the file in a browser and the picture builds up one piece at a time. GIF: an animation of the whole build.</p>
     </section>
   </div>
 
@@ -185,7 +186,7 @@ function refresh() {
   $("go").textContent = running ? "Pause" : (started && done < target ? "Resume" : "Start");
   $("reset").disabled = !started;
   const has = started && done > 0;
-  for (const id of ["dlsvg", "dlanim", "dlpng"]) $(id).disabled = !has;
+  for (const id of ["dlsvg", "dlanim", "dlpng", "dlgif"]) $(id).disabled = !has;
   for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "outline", "sample"]) $(id).disabled = started;
   $("drop").style.pointerEvents = started ? "none" : "";
   $("drop").style.opacity = started ? .5 : 1;
@@ -292,6 +293,15 @@ function saveSVG(anim) {
 }
 $("dlsvg").onclick = () => saveSVG(false);
 $("dlanim").onclick = () => saveSVG(true);
+$("dlgif").onclick = async () => {
+  const btn = $("dlgif");
+  btn.disabled = true; btn.textContent = "Making GIF...";
+  await sleep(30); // let the browser repaint before the encoder takes the thread
+  const gif = P.gif(8, 200);
+  btn.textContent = "Download GIF"; refresh();
+  if (gif.error) return setError(gif.error);
+  save("primitive.gif", gif, "image/gif");
+};
 $("dlpng").onclick = () => {
   const png = P.png();
   if (png.error) return setError(png.error);

@@ -50,7 +50,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `bg` | avg | starting background color (hex) |
 | `j` | 0 | number of parallel workers (default uses all cores) |
 | `seed` | random | RNG seed, for reproducible output (use with `-j 1`) |
-| `int` | 50 | frame interval for GIF output |
+| `int` | 8 | GIF output only: time each frame is shown, in hundredths of a second |
 | `anim` | 0 | animate SVG output: seconds between shapes appearing (0 = static) |
 | `edge` | 0 | 0-1: chance a new shape is anchored near high-detail areas (Sobel edges). Off by default. Measured gain is small: about 1% lower error in detailed regions, none overall. |
 | `algo` | shapes | `shapes` (default) or `quads`. With `quads` the picture is built from squares, and `-n` is the number of splits (1000 to 3000 is a good range). The shape-only flags (`-m`, `-a`, `-rep`, `-bg`, `-palette`, `-edge`, `-blur`, `-seed`, `-j`) are rejected with `quads`. |
@@ -61,13 +61,12 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
 | `v` | off | verbose output |
 | `vv` | off | very verbose output |
-| `int` | 50 | interval between frame in a gif in millis (works only with .gif output)|
 
 Tip: for detail, such as the curve of a smile, raise the shape count and the working resolution: `-n 400 -r 512` cut the error in a face region by about 27% compared with `-n 150 -r 256` on the Mona Lisa example, and took about 27 seconds. Triangles (`-m 1`) and rotated ellipses (`-m 7`) were about equally accurate at those settings; triangles gave a sharp low-poly look and ran 2x faster, ellipses a softer look.
 
 ### Web version
 
-`web/index.html` runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated) or PNG. Build the engine once, then serve the `web/` folder with any static file server:
+`web/index.html` runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated), PNG or an animated GIF. Build the engine once, then serve the `web/` folder with any static file server:
 
 ```
 GOOS=js GOARCH=wasm go build -o web/primitive.wasm ./cmd/wasm
@@ -123,7 +122,7 @@ Depending on the output filename extension provided, you can produce different t
 - `PNG`: raster output
 - `JPG`: raster output
 - `SVG`: vector output
-- `GIF`: animated output showing shapes being added - requires ImageMagick (specifically the `convert` command)
+- `GIF`: animated output showing the picture being built. The tool writes it itself, so nothing else needs to be installed. It uses one 256 color palette chosen from all the frames, and each frame stores only what changed.
 
 For PNG and SVG outputs, you can also include `%d`, `%03d`, etc. in the filename. In this case, each frame will be saved separately.
 

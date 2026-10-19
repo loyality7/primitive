@@ -170,6 +170,24 @@ func pngBytes(_ js.Value, _ []js.Value) any {
 	return toJS(out.Bytes())
 }
 
+// gif(delay, lastDelay) -> Uint8Array. Delays are in hundredths of a second.
+func gifBytes(_ js.Value, args []js.Value) any {
+	var frames []image.Image
+	switch {
+	case qmodel != nil:
+		frames = qmodel.Frames(0)
+	case model != nil && len(model.Shapes) > 0:
+		frames = model.Frames(0.001)
+	default:
+		return fail("nothing to export yet")
+	}
+	data, err := imageio.EncodeGIF(frames, args[0].Int(), args[1].Int())
+	if err != nil {
+		return fail(err.Error())
+	}
+	return toJS(data)
+}
+
 func main() {
 	api := map[string]any{
 		"init":      js.FuncOf(initModel),
@@ -179,6 +197,7 @@ func main() {
 		"pixels":    js.FuncOf(pixels),
 		"svg":       js.FuncOf(svg),
 		"png":       js.FuncOf(pngBytes),
+		"gif":       js.FuncOf(gifBytes),
 	}
 	js.Global().Set("primitive", js.ValueOf(api))
 	select {} // keep the runtime alive for JS calls

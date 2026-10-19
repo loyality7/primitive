@@ -109,7 +109,7 @@ func init() {
 	flag.StringVar(&Quality, "quality", "", "preset for -n and -r: draft (150 shapes, r256) or high (400 shapes, r512); explicit -n / -r win")
 	flag.Float64Var(&Edge, "edge", 0, "0-1: chance a shape is placed near high-detail areas (0 = uniform)")
 	flag.StringVar(&Palette, "palette", "", "restrict colors to comma-separated hex list, e.g. \"#000000,#ff0000,#ffffff\"")
-	flag.IntVar(&Interval, "int", 50, "interval between frame in a gif")
+	flag.IntVar(&Interval, "int", 8, "gif only: time each frame is shown, in hundredths of a second")
 }
 
 func errorMessage(message string) bool {
@@ -322,7 +322,7 @@ func main() {
 						check(imageio.SaveFile(path, out.SVG()))
 					case ".gif":
 						frames := out.Frames(0.001)
-						check(imageio.SaveGIFImageMagick(path, frames, Interval, 250))
+						check(imageio.SaveGIF(path, frames, Interval, 250))
 					}
 				}
 			}

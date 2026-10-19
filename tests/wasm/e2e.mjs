@@ -166,6 +166,19 @@ test("quads: circles on black, static and animated", () => {
   assert.ok(anim.includes('class="c"') && anim.includes('class="b"') && anim.includes('class="a"'));
 });
 
+test("gif export for shapes and for quads", () => {
+  const isGif = (b) => String.fromCharCode(...b.slice(0, 6)) === "GIF89a";
+  P.init(owl, 128, 128, "", 0);
+  assert.match(P.gif(8, 200).error, /nothing to export/);
+  for (let i = 0; i < 6; i++) P.step(1, 128);
+  const shapes = P.gif(8, 200);
+  assert.ok(isGif(shapes) && shapes.length > 500, "shape gif");
+  P.initQuads(owl, 128, 128);
+  P.stepQuads(200);
+  const quads = P.gif(8, 200);
+  assert.ok(isGif(quads) && quads.length > 500, "quad gif");
+});
+
 test("quads: bad image bytes are rejected", () => {
   assert.match(P.initQuads(new Uint8Array([1, 2, 3]), 128, 256).error, /could not read image/);
 });
