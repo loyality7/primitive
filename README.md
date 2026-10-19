@@ -18,6 +18,7 @@ Original on the left, result on the right.
 | <img src="examples/owl.png" width="256"/> | <img src="docs/owl-ellipses.png" width="256"/><br>250 ellipses (`-m 3`) |
 | <img src="examples/lenna.png" width="256"/> | <img src="docs/lenna-rotated-rects.png" width="256"/><br>200 rotated rectangles (`-m 5`) |
 | <img src="examples/pyramids.png" width="256"/> | <img src="docs/pyramids-polygons.png" width="256"/><br>200 polygons (`-m 8`) |
+| <img src="examples/monalisa.png" width="256"/> | <img src="docs/monalisa-quads.png" width="256"/><br>1500 splits (`-algo quads`) |
 
 ### Animated SVG
 
@@ -51,6 +52,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `int` | 50 | frame interval for GIF output |
 | `anim` | 0 | animate SVG output: seconds between shapes appearing (0 = static) |
 | `edge` | 0 | 0-1: chance a new shape is anchored near high-detail areas (Sobel edges). Off by default. Measured gain is small: about 1% lower error in detailed regions, none overall. |
+| `algo` | shapes | `shapes` (default) or `quads`. With `quads` the picture is built from squares, and `-n` is the number of splits (1000 to 3000 is a good range). The shape-only flags (`-m`, `-a`, `-rep`, `-bg`, `-palette`, `-edge`, `-anim`, `-blur`, `-seed`, `-j`) are rejected with `quads`. |
 | `quality` | n/a | preset for `n` and `r`: `draft` (150 shapes, `r` 256) or `high` (400 shapes, `r` 512). An explicit `-n` or `-r` overrides the preset. `high` took about 27s on a 512px image. |
 | `blur` | 0 | SVG output only: gaussian blur radius in image pixels. Try 1 to 2; 4 is very soft. PNG and JPG are unaffected. |
 | `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
@@ -62,7 +64,7 @@ Tip: for detail, such as the curve of a smile, raise the shape count and the wor
 
 ### Web version
 
-`web/index.html` runs the same engine in the browser through WebAssembly: pick a photo, watch the shapes appear, download SVG or PNG. Nothing is uploaded. Build the engine once, then serve the `web/` folder with any static file server:
+`web/index.html` runs both engines in the browser through WebAssembly: pick a photo, choose shapes or squares, watch the picture build, download SVG or PNG. Build the engine once, then serve the `web/` folder with any static file server:
 
 ```
 GOOS=js GOARCH=wasm go build -o web/primitive.wasm ./cmd/wasm
@@ -71,6 +73,16 @@ python -m http.server 8000     # then open http://localhost:8000/web/
 ```
 
 Hosting it needs only `index.html`, `wasm_exec.js` and `primitive.wasm`; Go is not needed on the server. The browser build uses one thread, so it is slower than the command line. The `tests/wasm/` scripts check it end to end in Node (`node tests/wasm/e2e.mjs`).
+
+### Quadtree mode
+
+`-algo quads` builds the picture from squares instead of shapes. It starts with one square filled with the average color of the photo, then keeps splitting the square with the largest error into four, up to `-n` times. Flat areas stay as a few big squares and the splits go to edges and gradients. It is fast and has no randomness, so the same input always gives the same output.
+
+```
+primitive -i photo.jpg -o out.png -algo quads -n 3000 -r 512
+```
+
+Output can be PNG, JPG, SVG (one `<rect>` per square) or GIF. The idea comes from [Quads](https://github.com/fogleman/Quads) by Michael Fogleman. This is a separate implementation written from the algorithm description.
 
 ### Project layout
 
@@ -81,6 +93,7 @@ primitive/            the engine: model, workers, scoring
   shape/              Shape interface and every shape (triangle, ellipse, ...), edge-weighted placement
   rasterize/          scanlines and path rasterising
   colors/             colors and palettes
+  quad/               quadtree engine (-algo quads)
   optimize/           hill climbing
   imageio/            load and save PNG, JPG, SVG, GIF
   internal/num/       small maths helpers

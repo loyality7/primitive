@@ -11,3 +11,5 @@ edge|-m 3 -edge 0.6|d83947bc958815031e2079b3d9262ce9d94ac93ac6ffa4cdd2bc610abfea
 palette|-m 1 -a 0 -palette #101010,#e8d9a0,#c0392b,#2d5a27|dc4b1884be40346f47e1889fc3769a134b9fe6d0ac7575d5d08b1aff11fd5d58
 blur-anim|-m 1 -blur 2 -anim 0.05|a1086d6655f2faedf977f546ccac157492e1e050dd55557c0bb5b4f89907c47e
 repeat|-m 1 -rep 2|f89b34cb5544cae4c046be3abbffda2ee1dda408b962def0b25da92995e19cd4
+quads|-algo quads|56d434f8531ca37dc766656da97d4fd4e9b41063cbddb832ddb325d892c8bb47
+quads-r128|-algo quads -r 128|3a3733f5b440af53514b835f80cb0f188bb35c8d2ade928c7fefce523fa77048

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"log"
 	"math/rand"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/loyality7/primitive/primitive"
 	"github.com/loyality7/primitive/primitive/colors"
 	"github.com/loyality7/primitive/primitive/imageio"
+	"github.com/loyality7/primitive/primitive/quad"
 	"github.com/loyality7/primitive/primitive/shape"
 	"github.com/nfnt/resize"
 )
@@ -38,8 +40,16 @@ var (
 	Palette    string
 	Edge       float64
 	Blur       float64
+	Algo       string
 	Quality    string
 )
+
+// renderer is what both engines offer for writing the output files.
+type renderer interface {
+	Image() image.Image
+	SVG() string
+	Frames(scoreDelta float64) []image.Image
+}
 
 type flagArray []string
 
@@ -74,7 +84,7 @@ func (i *shapeConfigArray) Set(value string) error {
 func init() {
 	flag.StringVar(&Input, "i", "", "input image path")
 	flag.Var(&Outputs, "o", "output image path")
-	flag.Var(&Configs, "n", "number of primitives")
+	flag.Var(&Configs, "n", "number of shapes, or number of splits with -algo quads")
 	flag.StringVar(&Background, "bg", "", "background color (hex)")
 	flag.IntVar(&Alpha, "a", 128, "alpha value")
 	flag.IntVar(&InputSize, "r", 256, "resize large input images to this size")
@@ -90,6 +100,7 @@ func init() {
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
 	flag.Float64Var(&Anim, "anim", 0, "animate SVG output: seconds between shapes appearing (0 = static)")
+	flag.StringVar(&Algo, "algo", "shapes", "shapes (default) or quads: a quadtree that keeps splitting the worst square into four")
 	flag.Float64Var(&Blur, "blur", 0, "SVG output only: gaussian blur radius in image pixels (0 = off)")
 	flag.StringVar(&Quality, "quality", "", "preset for -n and -r: draft (150 shapes, r256) or high (400 shapes, r512); explicit -n / -r win")
 	flag.Float64Var(&Edge, "edge", 0, "0-1: chance a shape is placed near high-detail areas (0 = uniform)")
@@ -150,6 +161,17 @@ func main() {
 			ok = errorMessage("ERROR: number argument must be > 0")
 		}
 	}
+	if Algo != "shapes" && Algo != "quads" {
+		ok = errorMessage("ERROR: algo must be shapes or quads")
+	}
+	if Algo == "quads" {
+		flag.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "m", "a", "rep", "bg", "palette", "edge", "anim", "blur", "seed", "j":
+				ok = errorMessage("ERROR: -" + f.Name + " does not apply to -algo quads")
+			}
+		})
+	}
 	if Interval < 0 {
 		ok = errorMessage("ERROR: negative frame interval not accepted")
 	}
@@ -205,12 +227,30 @@ func main() {
 	}
 
 	// run algorithm
-	model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
-	model.AnimStep = Anim
-	model.Blur = Blur
-	model.SetPalette(palette)
-	model.SetEdgeBias(Edge)
-	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
+	var out renderer
+	var step func(config shapeConfig) int // does one unit of work, returns a count for the log
+	var score func() float64
+	if Algo == "quads" {
+		qm := quad.NewModel(input, OutputSize)
+		out, score = qm, qm.Score
+		step = func(shapeConfig) int {
+			if qm.Split() {
+				return 1
+			}
+			return 0
+		}
+	} else {
+		model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
+		model.AnimStep = Anim
+		model.Blur = Blur
+		model.SetPalette(palette)
+		model.SetEdgeBias(Edge)
+		out, score = model, func() float64 { return model.Score }
+		step = func(config shapeConfig) int {
+			return model.Step(shape.Type(config.Mode), config.Alpha, config.Repeat)
+		}
+	}
+	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, score())
 	start := time.Now()
 	frame := 0
 	total := 0
@@ -226,10 +266,10 @@ func main() {
 
 			// find optimal shape and add it to the model
 			t := time.Now()
-			n := model.Step(shape.Type(config.Mode), config.Alpha, config.Repeat)
+			n := step(config)
 			nps := imageio.NumberString(float64(n) / time.Since(t).Seconds())
 			elapsed := time.Since(start).Seconds()
-			primitive.Log(1, "%d: t=%.3f, score=%.6f, n=%d, n/s=%s\n", frame, elapsed, model.Score, n, nps)
+			primitive.Log(1, "%d: t=%.3f, score=%.6f, n=%d, n/s=%s\n", frame, elapsed, score(), n, nps)
 
 			if !V && !VV {
 				progress(frame, total, start)
@@ -255,13 +295,13 @@ func main() {
 					default:
 						check(fmt.Errorf("unrecognized file extension: %s", ext))
 					case ".png":
-						check(imageio.SavePNG(path, model.Context.Image()))
+						check(imageio.SavePNG(path, out.Image()))
 					case ".jpg", ".jpeg":
-						check(imageio.SaveJPG(path, model.Context.Image(), 95))
+						check(imageio.SaveJPG(path, out.Image(), 95))
 					case ".svg":
-						check(imageio.SaveFile(path, model.SVG()))
+						check(imageio.SaveFile(path, out.SVG()))
 					case ".gif":
-						frames := model.Frames(0.001)
+						frames := out.Frames(0.001)
 						check(imageio.SaveGIFImageMagick(path, frames, Interval, 250))
 					}
 				}

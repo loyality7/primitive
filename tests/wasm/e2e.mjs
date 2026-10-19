@@ -103,5 +103,52 @@ test("every shape type and the edge option run", () => {
   }
 });
 
+test("quads: init, split, pixels, svg and png", () => {
+  const r = P.initQuads(owl, 128, 256);
+  assert.equal(r.error, undefined);
+  assert.equal(r.width, 256);
+  assert.equal(r.leaves, 1);
+  const s = P.stepQuads(50);
+  assert.equal(s.splits, 50);
+  assert.equal(s.leaves, 151); // each split adds 3 squares
+  assert.equal(s.finished, false);
+  assert.ok(s.score > 0 && s.score < 1);
+  const px = P.pixels();
+  assert.equal(px.length, 256 * 256 * 4);
+  const distinct = new Set();
+  for (let i = 0; i < px.length; i += 400) distinct.add(px[i] + "," + px[i + 1] + "," + px[i + 2]);
+  assert.ok(distinct.size > 10, "quad image looks flat");
+  const svg = P.svg(0, 0);
+  assert.equal((svg.match(/<rect/g) || []).length, 151);
+  assert.match(svg, /viewBox="0 0 128 128"/);
+  assert.deepEqual([...P.png().slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+});
+
+test("quads: more splits lower the error and it eventually finishes", () => {
+  P.initQuads(owl, 4, 64); // a 4x4 working image has only 16 pixels to split into
+  const a = P.stepQuads(1).score;
+  const b = P.stepQuads(100000);
+  assert.ok(b.score < a);
+  assert.equal(P.stepQuads(1).finished, true);
+  assert.equal(b.score, 0, "fully split image must be exact");
+});
+
+test("quads: bad image bytes are rejected", () => {
+  assert.match(P.initQuads(new Uint8Array([1, 2, 3]), 128, 256).error, /could not read image/);
+});
+
+test("switching between the shape and quad engines", () => {
+  P.init(owl, 128, 256, "", 0);
+  P.step(1, 128);
+  assert.ok(P.svg(0, 0).includes("<polygon"));
+  P.initQuads(owl, 128, 256);
+  P.stepQuads(5);
+  const q = P.svg(0, 0);
+  assert.ok(q.includes("<rect") && !q.includes("<polygon"));
+  P.init(owl, 128, 256, "", 0);
+  P.step(1, 128);
+  assert.ok(P.svg(0, 0).includes("<polygon") && !P.svg(0, 0).includes("<rect x="));
+});
+
 console.log(`\n${passed} passed`);
 process.exit(0); // the Go runtime keeps the event loop busy otherwise

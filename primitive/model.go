@@ -229,3 +229,6 @@ func (model *Model) SetEffort(candidates, restarts int) {
 		model.Restarts = restarts
 	}
 }
+
+// Image returns the picture drawn so far.
+func (model *Model) Image() image.Image { return model.Context.Image() }

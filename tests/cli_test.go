@@ -41,6 +41,9 @@ func TestGoldenOutputs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(dir, name+".svg")
 			base := []string{"-i", "../examples/owl.png", "-o", out, "-n", "15", "-j", "1", "-seed", "5"}
+			if strings.Contains(parts[1], "-algo quads") { // quads takes no seed or worker count
+				base = []string{"-i", "../examples/owl.png", "-o", out, "-n", "300"}
+			}
 			if b, err := exec.Command(bin, append(base, args...)...).CombinedOutput(); err != nil {
 				t.Fatalf("run failed: %v\n%s", err, b)
 			}
@@ -63,6 +66,9 @@ func TestCLIRejectsBadInput(t *testing.T) {
 		"bad quality":   {"-quality", "bogus"},
 		"negative blur": {"-blur", "-1", "-n", "2"},
 		"no count":      {},
+		"quads palette": {"-algo", "quads", "-palette", "#fff", "-n", "5"},
+		"quads shape":   {"-algo", "quads", "-m", "3", "-n", "5"},
+		"unknown algo":  {"-algo", "bogus", "-n", "5"},
 	}
 	for name, args := range cases {
 		full := append([]string{"-i", "../examples/owl.png", "-o", filepath.Join(dir, "x.svg")}, args...)

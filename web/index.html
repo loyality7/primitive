@@ -74,6 +74,13 @@
       <div class="row tight"><button id="sample" type="button">Try a sample</button></div>
       <div class="picked" id="picked"></div>
 
+      <label for="algo">Style</label>
+      <select id="algo">
+        <option value="shapes">Shapes</option>
+        <option value="quads">Squares (quadtree)</option>
+      </select>
+
+      <div id="shapeOnly">
       <label for="shape">Shape</label>
       <select id="shape">
         <option value="1">Triangles</option>
@@ -87,9 +94,11 @@
         <option value="0">Mix of all</option>
       </select>
 
-      <label for="count">Number of shapes</label>
+      </div>
+
+      <label for="count" id="countLabel">Number of shapes</label>
       <input id="count" type="number" min="10" max="1000" value="150">
-      <p class="hint">100 to 200 looks abstract, 400 or more shows detail.</p>
+      <p class="hint" id="countHint">100 to 200 looks abstract, 400 or more shows detail.</p>
 
       <label for="detail">Detail</label>
       <select id="detail">
@@ -98,6 +107,7 @@
         <option value="512">High (slow)</option>
       </select>
 
+      <div id="shapeOnly2">
       <label for="effort">Search effort</label>
       <select id="effort">
         <option value="100,3">Fast</option>
@@ -109,6 +119,7 @@
       <input id="palette" type="text" placeholder="#000000,#ff0000,#ffffff" autocomplete="off" spellcheck="false">
 
       <div class="check"><input id="edge" type="checkbox"><label for="edge" style="margin:0;color:inherit">Focus shapes on detailed areas</label></div>
+      </div>
 
       <div class="row">
         <button id="go" class="primary" type="button" disabled>Start</button>
@@ -143,6 +154,8 @@ let started = false;     // a run exists (controls locked until Reset)
 let running = false;
 let done = 0, target = 0, size = { w: OUT, h: OUT };
 let msTotal = 0;
+let leaves = 1;          // quads: squares drawn so far
+const quads = () => $("algo").value === "quads";
 
 const ctx = $("canvas").getContext("2d");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -169,7 +182,8 @@ function refresh() {
   $("reset").disabled = !started;
   const has = started && done > 0;
   for (const id of ["dlsvg", "dlanim", "dlpng"]) $(id).disabled = !has;
-  for (const id of ["shape", "count", "detail", "effort", "palette", "edge", "sample"]) $(id).disabled = started;
+  if (quads()) $("dlanim").disabled = true; // the fade-in animation is for shapes
+  for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "sample"]) $(id).disabled = started;
   $("drop").style.pointerEvents = started ? "none" : "";
   $("drop").style.opacity = started ? .5 : 1;
 }
@@ -177,8 +191,11 @@ function refresh() {
 function status() {
   const per = done ? Math.round(msTotal / done) : 0;
   $("progress").style.width = target ? (100 * done / target) + "%" : "0";
+  const text = quads()
+    ? `${done} of ${target} splits · ${leaves} squares`
+    : `${done} of ${target} shapes` + (per ? ` · ${per} ms per shape` : "");
   $("status").textContent = started
-    ? `${done} of ${target} shapes` + (per ? ` · ${per} ms per shape` : "") + (done >= target ? " · done" : "")
+    ? text + (done >= target ? " · done" : "")
     : (imageBytes ? "Ready. Press Start." : "Pick a photo to begin.");
 }
 
@@ -206,24 +223,38 @@ async function takePhoto(file) {
 }
 
 async function begin() {
-  const [cand, rest] = $("effort").value.split(",").map(Number);
-  const r = P.init(imageBytes, Number($("detail").value), OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest);
+  let r;
+  if (quads()) {
+    r = P.initQuads(imageBytes, Number($("detail").value), OUT);
+  } else {
+    const [cand, rest] = $("effort").value.split(",").map(Number);
+    r = P.init(imageBytes, Number($("detail").value), OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest);
+  }
   if (r.error) { setError(r.error); return false; }
   size = { w: r.width, h: r.height };
   $("canvas").width = size.w; $("canvas").height = size.h;
-  target = Math.max(10, Math.min(1000, Number($("count").value) || 150));
-  done = 0; msTotal = 0; started = true;
+  const max = quads() ? 20000 : 1000;
+  target = Math.max(10, Math.min(max, Number($("count").value) || (quads() ? 1500 : 150)));
+  done = 0; leaves = 1; msTotal = 0; started = true;
   return true;
 }
 
 async function loop() {
   running = true; refresh();
+  const batch = Math.max(1, Math.ceil(target / 120)); // quads: about 120 repaints per run
   while (running && done < target) {
     const t = performance.now();
-    const r = P.step(Number($("shape").value), 128);
-    if (r.error) { setError(r.error); break; }
+    if (quads()) {
+      const r = P.stepQuads(Math.min(batch, target - done));
+      if (r.error) { setError(r.error); break; }
+      done += r.splits; leaves = r.leaves;
+      if (r.finished) done = target; // nothing left to split: the picture is exact
+    } else {
+      const r = P.step(Number($("shape").value), 128);
+      if (r.error) { setError(r.error); break; }
+      done = r.shapes;
+    }
     msTotal += performance.now() - t;
-    done = r.shapes;
     draw(); status(); refresh();
     await sleep(0); // let the browser paint and handle clicks
   }
@@ -261,6 +292,19 @@ $("dlpng").onclick = () => {
   if (png.error) return setError(png.error);
   save("primitive.png", png, "image/png");
 };
+
+function applyStyle() {
+  const q = quads();
+  $("shapeOnly").hidden = $("shapeOnly2").hidden = q;
+  $("countLabel").textContent = q ? "Number of splits" : "Number of shapes";
+  $("count").max = q ? 20000 : 1000;
+  $("count").value = q ? 1500 : 150;
+  $("countHint").textContent = q
+    ? "Each split adds three squares. 1000 to 3000 looks good."
+    : "100 to 200 looks abstract, 400 or more shows detail.";
+  refresh();
+}
+$("algo").onchange = applyStyle;
 
 // photo input: click, drop, sample
 const drop = $("drop"), file = $("file");
