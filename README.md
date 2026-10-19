@@ -2,7 +2,7 @@
 
 > **Credit.** This project is based on [primitive](https://github.com/fogleman/primitive) by [Michael Fogleman](https://github.com/fogleman), released under the MIT license (see [LICENSE.md](LICENSE.md)). The core algorithm and the original code are his. The idea was inspired by Roger Johansson's [Genetic Programming: Evolution of Mona Lisa](https://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/).
 
-**Try it online:** [loyality7.github.io/primitive](https://loyality7.github.io/primitive/). It runs in your browser and your photo is not uploaded.
+**Try it online:** [loyality7.github.io/primitive](https://loyality7.github.io/primitive/)
 
 ### How it Works
 
