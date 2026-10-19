@@ -77,7 +77,7 @@ func init() {
 	flag.IntVar(&Alpha, "a", 128, "alpha value")
 	flag.IntVar(&InputSize, "r", 256, "resize large input images to this size")
 	flag.IntVar(&OutputSize, "s", 1024, "output image size")
-	flag.IntVar(&Mode, "m", 1, "0=combo 1=triangle 2=rect 3=ellipse 4=circle 5=rotatedrect 6=beziers 7=rotatedellipse 8=polygon")
+	flag.IntVar(&Mode, "m", 1, "0=combo 1=triangle 2=rect 3=ellipse 4=circle 5=rotatedrect 6=beziers 7=rotatedellipse 8=polygon 9=smart (triangles first, then rotated ellipses)")
 	flag.IntVar(&Workers, "j", 0, "number of parallel workers (default uses all cores)")
 	flag.IntVar(&Nth, "nth", 1, "save every Nth frame (put \"%d\" in path)")
 	flag.IntVar(&Repeat, "rep", 0, "add N extra shapes per iteration with reduced search")
@@ -206,7 +206,14 @@ func main() {
 
 			// find optimal shape and add it to the model
 			t := time.Now()
-			n := model.Step(primitive.ShapeType(config.Mode), config.Alpha, config.Repeat)
+			mode := config.Mode
+			if mode == 9 { // smart: broad triangles first, ellipses for detail
+				mode = 1
+				if i >= config.Count*2/5 {
+					mode = 7
+				}
+			}
+			n := model.Step(primitive.ShapeType(mode), config.Alpha, config.Repeat)
 			nps := primitive.NumberString(float64(n) / time.Since(t).Seconds())
 			elapsed := time.Since(start).Seconds()
 			primitive.Log(1, "%d: t=%.3f, score=%.6f, n=%d, n/s=%s\n", frame, elapsed, model.Score, n, nps)
