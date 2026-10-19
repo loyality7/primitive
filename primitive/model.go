@@ -11,6 +11,7 @@ import (
 type Model struct {
 	Sw, Sh, Vw, Vh int
 	AnimStep       float64 // seconds between shapes in SVG output, 0 = static
+	Blur           float64 // SVG-only gaussian blur radius in image pixels, 0 = off
 	Scale          float64
 	Background     Color
 	Target         *image.RGBA
@@ -96,6 +97,10 @@ func (model *Model) SVG() string {
 		lines = append(lines, "<style>.a{opacity:0;animation:p .25s ease-out forwards}@keyframes p{to{opacity:1}}</style>")
 	}
 	group := "<g transform=\"translate(0.5 0.5)\" fill-opacity=\"%f\">"
+	if model.Blur > 0 {
+		lines = append(lines, fmt.Sprintf("<defs><filter id=\"b\" x=\"-10%%\" y=\"-10%%\" width=\"120%%\" height=\"120%%\"><feGaussianBlur stdDeviation=\"%g\"/></filter></defs>", model.Blur))
+		group = "<g transform=\"translate(0.5 0.5)\" fill-opacity=\"%f\" filter=\"url(#b)\">"
+	}
 	lines = append(lines, fmt.Sprintf(group, float64(fillA)/255))
 	for i, shape := range model.Shapes {
 		var attrs []string

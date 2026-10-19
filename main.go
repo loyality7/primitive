@@ -35,6 +35,8 @@ var (
 	Anim       float64
 	Palette    string
 	Edge       float64
+	Blur       float64
+	Quality    string
 )
 
 var hexColor = regexp.MustCompile(`^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
@@ -88,6 +90,8 @@ func init() {
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
 	flag.Float64Var(&Anim, "anim", 0, "animate SVG output: seconds between shapes appearing (0 = static)")
+	flag.Float64Var(&Blur, "blur", 0, "SVG output only: gaussian blur radius in image pixels (0 = off)")
+	flag.StringVar(&Quality, "quality", "", "preset for -n and -r: draft (150 shapes, r256) or high (400 shapes, r512); explicit -n / -r win")
 	flag.Float64Var(&Edge, "edge", 0, "0-1: chance a shape is placed near high-detail areas (0 = uniform)")
 	flag.StringVar(&Palette, "palette", "", "restrict colors to comma-separated hex list, e.g. \"#000000,#ff0000,#ffffff\"")
 	flag.IntVar(&Interval, "int", 50, "interval between frame in a gif")
@@ -113,6 +117,25 @@ func main() {
 	}
 	if len(Outputs) == 0 {
 		ok = errorMessage("ERROR: output argument required")
+	}
+	if Blur < 0 {
+		ok = errorMessage("ERROR: blur must be >= 0")
+	}
+	if Quality != "" {
+		presets := map[string][2]int{"draft": {150, 256}, "high": {400, 512}}
+		p, found := presets[Quality]
+		if !found {
+			ok = errorMessage("ERROR: quality must be draft or high")
+		} else {
+			explicit := map[string]bool{}
+			flag.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+			if len(Configs) == 0 {
+				Configs = append(Configs, shapeConfig{p[0], Mode, Alpha, Repeat})
+			}
+			if !explicit["r"] {
+				InputSize = p[1]
+			}
+		}
 	}
 	if len(Configs) == 0 {
 		ok = errorMessage("ERROR: number argument required")
@@ -189,6 +212,7 @@ func main() {
 	// run algorithm
 	model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
 	model.AnimStep = Anim
+	model.Blur = Blur
 	model.SetEdgeBias(Edge)
 	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
 	start := time.Now()

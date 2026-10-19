@@ -76,3 +76,15 @@ func TestAnimatedSVG(t *testing.T) {
 		t.Fatal("animated SVG missing style or per-shape delay")
 	}
 }
+
+func TestBlurSVG(t *testing.T) {
+	m := run(5, 3)
+	if strings.Contains(m.SVG(), "feGaussianBlur") {
+		t.Fatal("blur must be off by default")
+	}
+	m.Blur = 2.5
+	s := m.SVG()
+	if !strings.Contains(s, `stdDeviation="2.5"`) || !strings.Contains(s, `filter="url(#b)"`) {
+		t.Fatal("blurred SVG missing filter definition or reference")
+	}
+}

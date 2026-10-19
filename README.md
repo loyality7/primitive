@@ -47,6 +47,8 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `int` | 50 | frame interval for GIF output |
 | `anim` | 0 | animate SVG output: seconds between shapes appearing (0 = static) |
 | `edge` | 0 | 0-1: chance a new shape is anchored near high-detail areas (Sobel edges). Off by default. Measured gain is small: about 1% lower error in detailed regions, none overall. |
+| `quality` | n/a | preset for `n` and `r`: `draft` (150 shapes, `r` 256) or `high` (400 shapes, `r` 512). An explicit `-n` or `-r` overrides the preset. `high` took about 27s on a 512px image. |
+| `blur` | 0 | SVG output only: gaussian blur radius in image pixels. Try 1 to 2; 4 is very soft. PNG and JPG are unaffected. |
 | `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
 | `v` | off | verbose output |
 | `vv` | off | very verbose output |
