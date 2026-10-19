@@ -1,5 +1,21 @@
 # Primitive Pictures
 
+> **Fork notice.** This is a fork of [fogleman/primitive](https://github.com/fogleman/primitive) by [Michael Fogleman](https://github.com/fogleman). All credit for the original algorithm and implementation goes to him. The original work is MIT licensed, and his copyright notice is kept in [LICENSE.md](LICENSE.md). The "Inspiration" section below also credits Roger Johansson's Mona Lisa experiment.
+
+### Changes in this fork
+
+Merged from open upstream pull requests, reviewed first, with two bugs fixed along the way:
+
+- [#118](https://github.com/fogleman/primitive/pull/118) (also [#73](https://github.com/fogleman/primitive/pull/73)): bezier shapes now mutate their stroke width. The case was unreachable before.
+- [#68](https://github.com/fogleman/primitive/pull/68): `drawLines` no longer recomputes per-line values for every pixel.
+- [#65](https://github.com/fogleman/primitive/pull/65): GIF output uses `magick convert` when `magick` is on PATH, which fixes Windows where `convert` is a different tool.
+- [#66](https://github.com/fogleman/primitive/pull/66): new `-int` flag sets the GIF frame interval.
+- [#117](https://github.com/fogleman/primitive/pull/117): new `-seed` flag. Fix added here: each worker gets `seed + worker index`, because the PR gave every worker the same seed so all cores searched the same shapes. Output is reproducible with `-j 1`.
+- [#79](https://github.com/fogleman/primitive/pull/79): SVG output uses a `viewBox` instead of a fixed size, which makes it easier to animate. Fix added here: the PR divided by `int(scale)`, which panics when `-s` is smaller than the working size.
+- Added `go.mod` / `go.sum`, so it builds with modern Go.
+
+Not merged: #63, #56, #97 and #99 conflict with master, and #72 breaks the build.
+
 Reproducing images with geometric primitives.
 
 ![Example](https://www.michaelfogleman.com/static/primitive/examples/16550611738.200.128.4.5.png)
@@ -27,7 +43,7 @@ You can tweet a picture to the bot and it will process it for you.
 
 Run it on your own images! First, [install Go](https://golang.org/doc/install).
 
-    go get -u github.com/fogleman/primitive
+    go install github.com/loyality7/primitive@latest
     primitive -i input.png -o output.png -n 100
 
 Small input images should be used (like 256x256px). You don't need the detail anyway and the code will run faster.
@@ -45,6 +61,8 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `a` | 128 | color alpha (use `0` to let the algorithm choose alpha for each shape) |
 | `bg` | avg | starting background color (hex) |
 | `j` | 0 | number of parallel workers (default uses all cores) |
+| `seed` | random | RNG seed, for reproducible output (use with `-j 1`) |
+| `int` | 50 | frame interval for GIF output |
 | `v` | off | verbose output |
 | `vv` | off | very verbose output |
 | `int` | 50 | interval between frame in a gif in millis (works only with .gif output)|
