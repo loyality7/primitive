@@ -35,7 +35,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `i` | n/a | input file |
 | `o` | n/a | output file |
 | `n` | n/a | number of shapes |
-| `m` | 1 | mode: 0=combo, 1=triangle, 2=rect, 3=ellipse, 4=circle, 5=rotatedrect, 6=beziers, 7=rotatedellipse, 8=polygon, 9=smart (triangles first, then rotated ellipses) |
+| `m` | 1 | mode: 0=combo, 1=triangle, 2=rect, 3=ellipse, 4=circle, 5=rotatedrect, 6=beziers, 7=rotatedellipse, 8=polygon |
 | `rep` | 0 | add N extra shapes each iteration with reduced search (mostly good for beziers) |
 | `nth` | 1 | save every Nth frame (only when `%d` is in output path) |
 | `r` | 256 | resize large input images to this size before processing |
@@ -52,7 +52,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `vv` | off | very verbose output |
 | `int` | 50 | interval between frame in a gif in millis (works only with .gif output)|
 
-Tip: triangles (`-m 1`) give a sharp low-poly look. For portraits and organic subjects, rotated ellipses (`-m 7`) follow curves such as a smile much better. `-m 9` mixes the two, with an angular base and rounded detail on top.
+Tip: triangles (`-m 1`) give a sharp low-poly look. For portraits and organic subjects, rotated ellipses (`-m 7`) follow curves such as a smile much better.
 
 ### Output Formats
 
