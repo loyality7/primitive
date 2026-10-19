@@ -3,9 +3,13 @@ package primitive
 import (
 	"image"
 	"math"
+
+	"github.com/loyality7/primitive/primitive/colors"
+	"github.com/loyality7/primitive/primitive/internal/num"
+	"github.com/loyality7/primitive/primitive/rasterize"
 )
 
-func computeColor(target, current *image.RGBA, lines []Scanline, alpha int) Color {
+func computeColor(target, current *image.RGBA, lines []rasterize.Scanline, alpha int, palette []colors.Color) colors.Color {
 	var rsum, gsum, bsum, count int64
 	a := 0x101 * 255 / alpha
 	for _, line := range lines {
@@ -25,33 +29,15 @@ func computeColor(target, current *image.RGBA, lines []Scanline, alpha int) Colo
 		}
 	}
 	if count == 0 {
-		return Color{}
+		return colors.Color{}
 	}
-	r := clampInt(int(rsum/count)>>8, 0, 255)
-	g := clampInt(int(gsum/count)>>8, 0, 255)
-	b := clampInt(int(bsum/count)>>8, 0, 255)
-	return snapToPalette(Color{r, g, b, alpha})
+	r := num.ClampInt(int(rsum/count)>>8, 0, 255)
+	g := num.ClampInt(int(gsum/count)>>8, 0, 255)
+	b := num.ClampInt(int(bsum/count)>>8, 0, 255)
+	return colors.Snap(colors.Color{R: r, G: g, B: b, A: alpha}, palette)
 }
 
-// Palette, when non-empty, restricts every shape color to its nearest entry.
-var Palette []Color
-
-func snapToPalette(c Color) Color {
-	if len(Palette) == 0 {
-		return c
-	}
-	best, bestD := Palette[0], -1
-	for _, p := range Palette {
-		dr, dg, db := p.R-c.R, p.G-c.G, p.B-c.B
-		if d := dr*dr + dg*dg + db*db; bestD < 0 || d < bestD {
-			best, bestD = p, d
-		}
-	}
-	best.A = c.A
-	return best
-}
-
-func copyLines(dst, src *image.RGBA, lines []Scanline) {
+func copyLines(dst, src *image.RGBA, lines []rasterize.Scanline) {
 	for _, line := range lines {
 		a := dst.PixOffset(line.X1, line.Y)
 		b := a + (line.X2-line.X1+1)*4
@@ -59,7 +45,7 @@ func copyLines(dst, src *image.RGBA, lines []Scanline) {
 	}
 }
 
-func drawLines(im *image.RGBA, c Color, lines []Scanline) {
+func drawLines(im *image.RGBA, c colors.Color, lines []rasterize.Scanline) {
 	const m = 0xffff
 	sr, sg, sb, sa := c.NRGBA().RGBA()
 	for _, line := range lines {
@@ -111,7 +97,7 @@ func differenceFull(a, b *image.RGBA) float64 {
 	return math.Sqrt(float64(total)/float64(w*h*4)) / 255
 }
 
-func differencePartial(target, before, after *image.RGBA, score float64, lines []Scanline) float64 {
+func differencePartial(target, before, after *image.RGBA, score float64, lines []rasterize.Scanline) float64 {
 	size := target.Bounds().Size()
 	w, h := size.X, size.Y
 	total := uint64(math.Pow(score*255, 2) * float64(w*h*4))

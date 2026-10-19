@@ -1,4 +1,4 @@
-package primitive
+package imageio
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -124,74 +123,26 @@ func NumberString(x float64) string {
 	return fmt.Sprintf("%.1f%s", x, "T")
 }
 
-func radians(degrees float64) float64 {
-	return degrees * math.Pi / 180
-}
-
-func degrees(radians float64) float64 {
-	return radians * 180 / math.Pi
-}
-
-func clamp(x, lo, hi float64) float64 {
-	if x < lo {
-		return lo
-	}
-	if x > hi {
-		return hi
-	}
-	return x
-}
-
-func clampInt(x, lo, hi int) int {
-	if x < lo {
-		return lo
-	}
-	if x > hi {
-		return hi
-	}
-	return x
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func rotate(x, y, theta float64) (rx, ry float64) {
-	rx = x*math.Cos(theta) - y*math.Sin(theta)
-	ry = x*math.Sin(theta) + y*math.Cos(theta)
-	return
-}
-
-func imageToRGBA(src image.Image) *image.RGBA {
+func ImageToRGBA(src image.Image) *image.RGBA {
 	dst := image.NewRGBA(src.Bounds())
 	draw.Draw(dst, dst.Rect, src, image.ZP, draw.Src)
 	return dst
 }
 
-func copyRGBA(src *image.RGBA) *image.RGBA {
+func CopyRGBA(src *image.RGBA) *image.RGBA {
 	dst := image.NewRGBA(src.Bounds())
 	copy(dst.Pix, src.Pix)
 	return dst
 }
 
-func uniformRGBA(r image.Rectangle, c color.Color) *image.RGBA {
+func UniformRGBA(r image.Rectangle, c color.Color) *image.RGBA {
 	im := image.NewRGBA(r)
 	draw.Draw(im, im.Bounds(), &image.Uniform{c}, image.ZP, draw.Src)
 	return im
 }
 
 func AverageImageColor(im image.Image) color.NRGBA {
-	rgba := imageToRGBA(im)
+	rgba := ImageToRGBA(im)
 	size := rgba.Bounds().Size()
 	w, h := size.X, size.Y
 	var r, g, b int

@@ -4,35 +4,29 @@ import (
 	"image"
 	"math/rand"
 
-	"github.com/golang/freetype/raster"
+	"github.com/loyality7/primitive/primitive/colors"
+	"github.com/loyality7/primitive/primitive/optimize"
+	"github.com/loyality7/primitive/primitive/shape"
 )
 
 type Worker struct {
-	W, H       int
+	*shape.Env // size, RNG, rasteriser buffer, edge placement
 	Target     *image.RGBA
 	Current    *image.RGBA
 	Buffer     *image.RGBA
-	Rasterizer *raster.Rasterizer
-	Lines      []Scanline
-	Rnd        *rand.Rand
 	Score      float64
 	Counter    int
-	Edge       *EdgeMap // nil = uniform placement
-	EdgeBias   float64  // chance a new shape is anchored by Edge instead of uniformly
+	Palette    []colors.Color // nil = no color restriction
 }
 
 func NewWorker(target *image.RGBA, seed int64) *Worker {
 	w := target.Bounds().Size().X
 	h := target.Bounds().Size().Y
-	worker := Worker{}
-	worker.W = w
-	worker.H = h
-	worker.Target = target
-	worker.Buffer = image.NewRGBA(target.Bounds())
-	worker.Rasterizer = raster.NewRasterizer(w, h)
-	worker.Lines = make([]Scanline, 0, 4096) // TODO: based on height
-	worker.Rnd = rand.New(rand.NewSource(seed))
-	return &worker
+	return &Worker{
+		Env:    shape.NewEnv(w, h, rand.New(rand.NewSource(seed))),
+		Target: target,
+		Buffer: image.NewRGBA(target.Bounds()),
+	}
 }
 
 func (worker *Worker) Init(current *image.RGBA, score float64) {
@@ -41,22 +35,22 @@ func (worker *Worker) Init(current *image.RGBA, score float64) {
 	worker.Counter = 0
 }
 
-func (worker *Worker) Energy(shape Shape, alpha int) float64 {
+func (worker *Worker) Energy(sh shape.Shape, alpha int) float64 {
 	worker.Counter++
-	lines := shape.Rasterize()
-	color := computeColor(worker.Target, worker.Current, lines, alpha)
+	lines := sh.Rasterize()
+	color := computeColor(worker.Target, worker.Current, lines, alpha, worker.Palette)
 	copyLines(worker.Buffer, worker.Current, lines)
 	drawLines(worker.Buffer, color, lines)
 	return differencePartial(worker.Target, worker.Current, worker.Buffer, worker.Score, lines)
 }
 
-func (worker *Worker) BestHillClimbState(t ShapeType, a, n, age, m int) *State {
+func (worker *Worker) BestHillClimbState(t shape.Type, a, n, age, m int) *State {
 	var bestEnergy float64
 	var bestState *State
 	for i := 0; i < m; i++ {
 		state := worker.BestRandomState(t, a, n)
 		before := state.Energy()
-		state = HillClimb(state, age).(*State)
+		state = optimize.HillClimb(state, age).(*State)
 		energy := state.Energy()
 		vv("%dx random: %.6f -> %dx hill climb: %.6f\n", n, before, age, energy)
 		if i == 0 || energy < bestEnergy {
@@ -67,7 +61,7 @@ func (worker *Worker) BestHillClimbState(t ShapeType, a, n, age, m int) *State {
 	return bestState
 }
 
-func (worker *Worker) BestRandomState(t ShapeType, a, n int) *State {
+func (worker *Worker) BestRandomState(t shape.Type, a, n int) *State {
 	var bestEnergy float64
 	var bestState *State
 	for i := 0; i < n; i++ {
@@ -81,46 +75,25 @@ func (worker *Worker) BestRandomState(t ShapeType, a, n int) *State {
 	return bestState
 }
 
-func (worker *Worker) RandomState(t ShapeType, a int) *State {
+func (worker *Worker) RandomState(t shape.Type, a int) *State {
 	switch t {
 	default:
-		return worker.RandomState(ShapeType(worker.Rnd.Intn(8)+1), a)
-	case ShapeTypeTriangle:
-		return NewState(worker, NewRandomTriangle(worker), a)
-	case ShapeTypeRectangle:
-		return NewState(worker, NewRandomRectangle(worker), a)
-	case ShapeTypeEllipse:
-		return NewState(worker, NewRandomEllipse(worker), a)
-	case ShapeTypeCircle:
-		return NewState(worker, NewRandomCircle(worker), a)
-	case ShapeTypeRotatedRectangle:
-		return NewState(worker, NewRandomRotatedRectangle(worker), a)
-	case ShapeTypeQuadratic:
-		return NewState(worker, NewRandomQuadratic(worker), a)
-	case ShapeTypeRotatedEllipse:
-		return NewState(worker, NewRandomRotatedEllipse(worker), a)
-	case ShapeTypePolygon:
-		return NewState(worker, NewRandomPolygon(worker, 4, false), a)
+		return worker.RandomState(shape.Type(worker.Rnd.Intn(8)+1), a)
+	case shape.TypeTriangle:
+		return NewState(worker, shape.NewRandomTriangle(worker.Env), a)
+	case shape.TypeRectangle:
+		return NewState(worker, shape.NewRandomRectangle(worker.Env), a)
+	case shape.TypeEllipse:
+		return NewState(worker, shape.NewRandomEllipse(worker.Env), a)
+	case shape.TypeCircle:
+		return NewState(worker, shape.NewRandomCircle(worker.Env), a)
+	case shape.TypeRotatedRectangle:
+		return NewState(worker, shape.NewRandomRotatedRectangle(worker.Env), a)
+	case shape.TypeQuadratic:
+		return NewState(worker, shape.NewRandomQuadratic(worker.Env), a)
+	case shape.TypeRotatedEllipse:
+		return NewState(worker, shape.NewRandomRotatedEllipse(worker.Env), a)
+	case shape.TypePolygon:
+		return NewState(worker, shape.NewRandomPolygon(worker.Env, 4, false), a)
 	}
-}
-
-// RandomPoint picks where a new random shape is anchored. With no edge map it
-// is uniform and consumes the RNG exactly as before.
-func (worker *Worker) RandomPoint() (int, int) {
-	rnd := worker.Rnd
-	if worker.Edge != nil && rnd.Float64() < worker.EdgeBias {
-		return worker.Edge.Sample(rnd)
-	}
-	x := rnd.Intn(worker.W)
-	return x, rnd.Intn(worker.H)
-}
-
-func (worker *Worker) RandomPointF() (float64, float64) {
-	rnd := worker.Rnd
-	if worker.Edge != nil && rnd.Float64() < worker.EdgeBias {
-		x, y := worker.Edge.Sample(rnd)
-		return float64(x) + rnd.Float64(), float64(y) + rnd.Float64()
-	}
-	x := rnd.Float64() * float64(worker.W)
-	return x, rnd.Float64() * float64(worker.H)
 }

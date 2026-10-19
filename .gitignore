@@ -6,3 +6,6 @@
 /*.jpg
 /*.jpeg
 /internal.md
+/bin/
+/web/primitive.wasm
+/web/wasm_exec.js

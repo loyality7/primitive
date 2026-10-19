@@ -25,7 +25,7 @@ Original on the left, result on the right.
 
 Run it on your own images! First, [install Go](https://golang.org/doc/install).
 
-    go install github.com/loyality7/primitive@latest
+    go install github.com/loyality7/primitive/cmd/primitive@latest
     primitive -i input.png -o output.png -n 100
 
 Small input images should be used (like 256x256px). You don't need the detail anyway and the code will run faster.
@@ -55,6 +55,28 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `int` | 50 | interval between frame in a gif in millis (works only with .gif output)|
 
 Tip: for detail, such as the curve of a smile, raise the shape count and the working resolution: `-n 400 -r 512` cut the error in a face region by about 27% compared with `-n 150 -r 256` on the Mona Lisa example, and took about 27 seconds. Triangles (`-m 1`) and rotated ellipses (`-m 7`) were about equally accurate at those settings; triangles gave a sharp low-poly look and ran 2x faster, ellipses a softer look.
+
+### Project layout
+
+```
+cmd/primitive/        command-line tool
+cmd/wasm/             browser entry point (Go compiled to WebAssembly)
+primitive/            the engine: model, workers, scoring
+  shape/              Shape interface and every shape (triangle, ellipse, ...), edge-weighted placement
+  rasterize/          scanlines and path rasterising
+  colors/             colors and palettes
+  optimize/           hill climbing
+  imageio/            load and save PNG, JPG, SVG, GIF
+  internal/num/       small maths helpers
+tests/                all tests, with golden outputs in tests/testdata
+web/                  browser page for the WASM build
+contrib/              old Python bot and scripts, not used by the tool
+docs/, examples/      images used by this README and sample inputs
+```
+
+To add a new shape, implement `shape.Shape` in `primitive/shape/` and register it in `Worker.RandomState`. Run `go test ./...` before and after: the golden tests fail if any existing output changes.
+
+Build with `go build -o bin/primitive ./cmd/primitive`, or `make build`, `make web`, `make test` if you have make.
 
 ### Output Formats
 

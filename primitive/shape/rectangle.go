@@ -1,24 +1,27 @@
-package primitive
+package shape
 
 import (
 	"fmt"
 	"math"
 
 	"github.com/fogleman/gg"
+
+	"github.com/loyality7/primitive/primitive/internal/num"
+	"github.com/loyality7/primitive/primitive/rasterize"
 )
 
 type Rectangle struct {
-	Worker *Worker
+	Env    *Env
 	X1, Y1 int
 	X2, Y2 int
 }
 
-func NewRandomRectangle(worker *Worker) *Rectangle {
-	rnd := worker.Rnd
-	x1, y1 := worker.RandomPoint()
-	x2 := clampInt(x1+rnd.Intn(32)+1, 0, worker.W-1)
-	y2 := clampInt(y1+rnd.Intn(32)+1, 0, worker.H-1)
-	return &Rectangle{worker, x1, y1, x2, y2}
+func NewRandomRectangle(env *Env) *Rectangle {
+	rnd := env.Rnd
+	x1, y1 := env.RandomPoint()
+	x2 := num.ClampInt(x1+rnd.Intn(32)+1, 0, env.W-1)
+	y2 := num.ClampInt(y1+rnd.Intn(32)+1, 0, env.H-1)
+	return &Rectangle{env, x1, y1, x2, y2}
 }
 
 func (r *Rectangle) bounds() (x1, y1, x2, y2 int) {
@@ -54,42 +57,42 @@ func (r *Rectangle) Copy() Shape {
 }
 
 func (r *Rectangle) Mutate() {
-	w := r.Worker.W
-	h := r.Worker.H
-	rnd := r.Worker.Rnd
+	w := r.Env.W
+	h := r.Env.H
+	rnd := r.Env.Rnd
 	switch rnd.Intn(2) {
 	case 0:
-		r.X1 = clampInt(r.X1+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y1 = clampInt(r.Y1+int(rnd.NormFloat64()*16), 0, h-1)
+		r.X1 = num.ClampInt(r.X1+int(rnd.NormFloat64()*16), 0, w-1)
+		r.Y1 = num.ClampInt(r.Y1+int(rnd.NormFloat64()*16), 0, h-1)
 	case 1:
-		r.X2 = clampInt(r.X2+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y2 = clampInt(r.Y2+int(rnd.NormFloat64()*16), 0, h-1)
+		r.X2 = num.ClampInt(r.X2+int(rnd.NormFloat64()*16), 0, w-1)
+		r.Y2 = num.ClampInt(r.Y2+int(rnd.NormFloat64()*16), 0, h-1)
 	}
 }
 
-func (r *Rectangle) Rasterize() []Scanline {
+func (r *Rectangle) Rasterize() []rasterize.Scanline {
 	x1, y1, x2, y2 := r.bounds()
-	lines := r.Worker.Lines[:0]
+	lines := r.Env.Lines[:0]
 	for y := y1; y <= y2; y++ {
-		lines = append(lines, Scanline{y, x1, x2, 0xffff})
+		lines = append(lines, rasterize.Scanline{Y: y, X1: x1, X2: x2, Alpha: 0xffff})
 	}
 	return lines
 }
 
 type RotatedRectangle struct {
-	Worker *Worker
+	Env    *Env
 	X, Y   int
 	Sx, Sy int
 	Angle  int
 }
 
-func NewRandomRotatedRectangle(worker *Worker) *RotatedRectangle {
-	rnd := worker.Rnd
-	x, y := worker.RandomPoint()
+func NewRandomRotatedRectangle(env *Env) *RotatedRectangle {
+	rnd := env.Rnd
+	x, y := env.RandomPoint()
 	sx := rnd.Intn(32) + 1
 	sy := rnd.Intn(32) + 1
 	a := rnd.Intn(360)
-	r := &RotatedRectangle{worker, x, y, sx, sy, a}
+	r := &RotatedRectangle{env, x, y, sx, sy, a}
 	r.Mutate()
 	return r
 }
@@ -98,7 +101,7 @@ func (r *RotatedRectangle) Draw(dc *gg.Context, scale float64) {
 	sx, sy := float64(r.Sx), float64(r.Sy)
 	dc.Push()
 	dc.Translate(float64(r.X), float64(r.Y))
-	dc.Rotate(radians(float64(r.Angle)))
+	dc.Rotate(num.Radians(float64(r.Angle)))
 	dc.DrawRectangle(-sx/2, -sy/2, sx, sy)
 	dc.Pop()
 	dc.Fill()
@@ -116,22 +119,22 @@ func (r *RotatedRectangle) Copy() Shape {
 }
 
 func (r *RotatedRectangle) Mutate() {
-	w := r.Worker.W
-	h := r.Worker.H
-	rnd := r.Worker.Rnd
+	w := r.Env.W
+	h := r.Env.H
+	rnd := r.Env.Rnd
 	switch rnd.Intn(3) {
 	case 0:
-		r.X = clampInt(r.X+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y = clampInt(r.Y+int(rnd.NormFloat64()*16), 0, h-1)
+		r.X = num.ClampInt(r.X+int(rnd.NormFloat64()*16), 0, w-1)
+		r.Y = num.ClampInt(r.Y+int(rnd.NormFloat64()*16), 0, h-1)
 	case 1:
-		r.Sx = clampInt(r.Sx+int(rnd.NormFloat64()*16), 1, w-1)
-		r.Sy = clampInt(r.Sy+int(rnd.NormFloat64()*16), 1, h-1)
+		r.Sx = num.ClampInt(r.Sx+int(rnd.NormFloat64()*16), 1, w-1)
+		r.Sy = num.ClampInt(r.Sy+int(rnd.NormFloat64()*16), 1, h-1)
 	case 2:
 		r.Angle = r.Angle + int(rnd.NormFloat64()*32)
 	}
 	// for !r.Valid() {
-	// 	r.Sx = clampInt(r.Sx+int(rnd.NormFloat64()*16), 0, w-1)
-	// 	r.Sy = clampInt(r.Sy+int(rnd.NormFloat64()*16), 0, h-1)
+	// 	r.Sx = num.ClampInt(r.Sx+int(rnd.NormFloat64()*16), 0, w-1)
+	// 	r.Sy = num.ClampInt(r.Sy+int(rnd.NormFloat64()*16), 0, h-1)
 	// }
 }
 
@@ -144,21 +147,21 @@ func (r *RotatedRectangle) Valid() bool {
 	return aspect <= 5
 }
 
-func (r *RotatedRectangle) Rasterize() []Scanline {
-	w := r.Worker.W
-	h := r.Worker.H
+func (r *RotatedRectangle) Rasterize() []rasterize.Scanline {
+	w := r.Env.W
+	h := r.Env.H
 	sx, sy := float64(r.Sx), float64(r.Sy)
-	angle := radians(float64(r.Angle))
-	rx1, ry1 := rotate(-sx/2, -sy/2, angle)
-	rx2, ry2 := rotate(sx/2, -sy/2, angle)
-	rx3, ry3 := rotate(sx/2, sy/2, angle)
-	rx4, ry4 := rotate(-sx/2, sy/2, angle)
+	angle := num.Radians(float64(r.Angle))
+	rx1, ry1 := num.Rotate(-sx/2, -sy/2, angle)
+	rx2, ry2 := num.Rotate(sx/2, -sy/2, angle)
+	rx3, ry3 := num.Rotate(sx/2, sy/2, angle)
+	rx4, ry4 := num.Rotate(-sx/2, sy/2, angle)
 	x1, y1 := int(rx1)+r.X, int(ry1)+r.Y
 	x2, y2 := int(rx2)+r.X, int(ry2)+r.Y
 	x3, y3 := int(rx3)+r.X, int(ry3)+r.Y
 	x4, y4 := int(rx4)+r.X, int(ry4)+r.Y
-	miny := minInt(y1, minInt(y2, minInt(y3, y4)))
-	maxy := maxInt(y1, maxInt(y2, maxInt(y3, y4)))
+	miny := num.MinInt(y1, num.MinInt(y2, num.MinInt(y3, y4)))
+	maxy := num.MaxInt(y1, num.MaxInt(y2, num.MaxInt(y3, y4)))
 	n := maxy - miny + 1
 	min := make([]int, n)
 	max := make([]int, n)
@@ -176,20 +179,20 @@ func (r *RotatedRectangle) Rasterize() []Scanline {
 			t := float64(j) / float64(count-1)
 			xi := int(x + dx*t)
 			yi := int(y+dy*t) - miny
-			min[yi] = minInt(min[yi], xi)
-			max[yi] = maxInt(max[yi], xi)
+			min[yi] = num.MinInt(min[yi], xi)
+			max[yi] = num.MaxInt(max[yi], xi)
 		}
 	}
-	lines := r.Worker.Lines[:0]
+	lines := r.Env.Lines[:0]
 	for i := 0; i < n; i++ {
 		y := miny + i
 		if y < 0 || y >= h {
 			continue
 		}
-		a := maxInt(min[i], 0)
-		b := minInt(max[i], w-1)
+		a := num.MaxInt(min[i], 0)
+		b := num.MinInt(max[i], w-1)
 		if b >= a {
-			lines = append(lines, Scanline{y, a, b, 0xffff})
+			lines = append(lines, rasterize.Scanline{Y: y, X1: a, X2: b, Alpha: 0xffff})
 		}
 	}
 	return lines

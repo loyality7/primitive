@@ -1,4 +1,4 @@
-package primitive
+package optimize
 
 type Annealable interface {
 	Energy() float64

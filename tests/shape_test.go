@@ -1,10 +1,12 @@
-package primitive
+package tests
 
 import (
 	"image"
 	"image/color"
 	"math/rand"
 	"testing"
+
+	"github.com/loyality7/primitive/primitive/shape"
 )
 
 // left half flat grey, right half vertical stripes
@@ -12,9 +14,9 @@ func stripedImage() *image.RGBA {
 	im := image.NewRGBA(image.Rect(0, 0, 64, 64))
 	for y := 0; y < 64; y++ {
 		for x := 0; x < 64; x++ {
-			c := color.RGBA{128, 128, 128, 255}
+			c := color.RGBA{R: 128, G: 128, B: 128, A: 255}
 			if x >= 32 && x%2 == 0 {
-				c = color.RGBA{255, 255, 255, 255}
+				c = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 			}
 			im.SetRGBA(x, y, c)
 		}
@@ -23,7 +25,7 @@ func stripedImage() *image.RGBA {
 }
 
 func TestEdgeMapFavoursDetail(t *testing.T) {
-	e := NewEdgeMap(stripedImage())
+	e := shape.NewEdgeMap(stripedImage())
 	rnd := rand.New(rand.NewSource(1))
 	right := 0
 	const n = 20000
@@ -42,13 +44,12 @@ func TestEdgeMapFavoursDetail(t *testing.T) {
 }
 
 func TestRandomPointUniformWhenOff(t *testing.T) {
-	w := NewWorker(stripedImage(), 1)
-	rnd := rand.New(rand.NewSource(9))
-	w.Rnd = rand.New(rand.NewSource(9))
+	env := shape.NewEnv(64, 64, rand.New(rand.NewSource(9)))
+	plain := rand.New(rand.NewSource(9))
 	for i := 0; i < 100; i++ {
-		x, y := w.RandomPoint()
-		wx := rnd.Intn(64)
-		wy := rnd.Intn(64)
+		x, y := env.RandomPoint()
+		wx := plain.Intn(64)
+		wy := plain.Intn(64)
 		if x != wx || y != wy {
 			t.Fatalf("edge off must match plain Intn draws, got %d,%d want %d,%d", x, y, wx, wy)
 		}

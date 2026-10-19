@@ -1,10 +1,12 @@
-package primitive
+package shape
 
 import (
 	"image"
 	"math"
 	"math/rand"
 	"sort"
+
+	"github.com/loyality7/primitive/primitive/internal/num"
 )
 
 // EdgeMap is a cumulative distribution over pixels weighted by local
@@ -26,7 +28,7 @@ func NewEdgeMap(target *image.RGBA) *EdgeMap {
 		}
 	}
 	at := func(x, y int) float64 {
-		return luma[clampInt(y, 0, h-1)*w+clampInt(x, 0, w-1)]
+		return luma[num.ClampInt(y, 0, h-1)*w+num.ClampInt(x, 0, w-1)]
 	}
 	cdf := make([]float64, w*h)
 	var total float64

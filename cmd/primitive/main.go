@@ -7,13 +7,15 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/loyality7/primitive/primitive"
+	"github.com/loyality7/primitive/primitive/colors"
+	"github.com/loyality7/primitive/primitive/imageio"
+	"github.com/loyality7/primitive/primitive/shape"
 	"github.com/nfnt/resize"
 )
 
@@ -38,8 +40,6 @@ var (
 	Blur       float64
 	Quality    string
 )
-
-var hexColor = regexp.MustCompile(`^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 
 type flagArray []string
 
@@ -174,15 +174,10 @@ func main() {
 	rand.Seed(Seed)
 
 	// color palette
-	if Palette != "" {
-		for _, h := range strings.Split(Palette, ",") {
-			h = strings.TrimSpace(h)
-			if !hexColor.MatchString(h) {
-				fmt.Fprintf(os.Stderr, "ERROR: invalid palette color %q (want #rgb or #rrggbb)\n", h)
-				os.Exit(1)
-			}
-			primitive.Palette = append(primitive.Palette, primitive.MakeHexColor(h))
-		}
+	palette, err := colors.ParsePalette(Palette)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ERROR:", err)
+		os.Exit(1)
 	}
 
 	// determine worker count
@@ -192,7 +187,7 @@ func main() {
 
 	// read input image
 	primitive.Log(1, "reading %s\n", Input)
-	input, err := primitive.LoadImage(Input)
+	input, err := imageio.LoadImage(Input)
 	check(err)
 
 	// scale down input image if needed
@@ -202,17 +197,18 @@ func main() {
 	}
 
 	// determine background color
-	var bg primitive.Color
+	var bg colors.Color
 	if Background == "" {
-		bg = primitive.MakeColor(primitive.AverageImageColor(input))
+		bg = colors.MakeColor(imageio.AverageImageColor(input))
 	} else {
-		bg = primitive.MakeHexColor(Background)
+		bg = colors.MakeHexColor(Background)
 	}
 
 	// run algorithm
 	model := primitive.NewModel(input, bg, OutputSize, Workers, Seed+1)
 	model.AnimStep = Anim
 	model.Blur = Blur
+	model.SetPalette(palette)
 	model.SetEdgeBias(Edge)
 	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
 	start := time.Now()
@@ -230,8 +226,8 @@ func main() {
 
 			// find optimal shape and add it to the model
 			t := time.Now()
-			n := model.Step(primitive.ShapeType(config.Mode), config.Alpha, config.Repeat)
-			nps := primitive.NumberString(float64(n) / time.Since(t).Seconds())
+			n := model.Step(shape.Type(config.Mode), config.Alpha, config.Repeat)
+			nps := imageio.NumberString(float64(n) / time.Since(t).Seconds())
 			elapsed := time.Since(start).Seconds()
 			primitive.Log(1, "%d: t=%.3f, score=%.6f, n=%d, n/s=%s\n", frame, elapsed, model.Score, n, nps)
 
@@ -259,14 +255,14 @@ func main() {
 					default:
 						check(fmt.Errorf("unrecognized file extension: %s", ext))
 					case ".png":
-						check(primitive.SavePNG(path, model.Context.Image()))
+						check(imageio.SavePNG(path, model.Context.Image()))
 					case ".jpg", ".jpeg":
-						check(primitive.SaveJPG(path, model.Context.Image(), 95))
+						check(imageio.SaveJPG(path, model.Context.Image(), 95))
 					case ".svg":
-						check(primitive.SaveFile(path, model.SVG()))
+						check(imageio.SaveFile(path, model.SVG()))
 					case ".gif":
 						frames := model.Frames(0.001)
-						check(primitive.SaveGIFImageMagick(path, frames, Interval, 250))
+						check(imageio.SaveGIFImageMagick(path, frames, Interval, 250))
 					}
 				}
 			}

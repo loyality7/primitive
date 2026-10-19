@@ -1,20 +1,26 @@
 package primitive
 
+import (
+	"github.com/loyality7/primitive/primitive/internal/num"
+	"github.com/loyality7/primitive/primitive/optimize"
+	"github.com/loyality7/primitive/primitive/shape"
+)
+
 type State struct {
 	Worker      *Worker
-	Shape       Shape
+	Shape       shape.Shape
 	Alpha       int
 	MutateAlpha bool
 	Score       float64
 }
 
-func NewState(worker *Worker, shape Shape, alpha int) *State {
+func NewState(worker *Worker, sh shape.Shape, alpha int) *State {
 	var mutateAlpha bool
 	if alpha == 0 {
 		alpha = 128
 		mutateAlpha = true
 	}
-	return &State{worker, shape, alpha, mutateAlpha, -1}
+	return &State{worker, sh, alpha, mutateAlpha, -1}
 }
 
 func (state *State) Energy() float64 {
@@ -29,7 +35,7 @@ func (state *State) DoMove() interface{} {
 	oldState := state.Copy()
 	state.Shape.Mutate()
 	if state.MutateAlpha {
-		state.Alpha = clampInt(state.Alpha+rnd.Intn(21)-10, 1, 255)
+		state.Alpha = num.ClampInt(state.Alpha+rnd.Intn(21)-10, 1, 255)
 	}
 	state.Score = -1
 	return oldState
@@ -42,7 +48,7 @@ func (state *State) UndoMove(undo interface{}) {
 	state.Score = oldState.Score
 }
 
-func (state *State) Copy() Annealable {
+func (state *State) Copy() optimize.Annealable {
 	return &State{
 		state.Worker, state.Shape.Copy(), state.Alpha, state.MutateAlpha, state.Score}
 }

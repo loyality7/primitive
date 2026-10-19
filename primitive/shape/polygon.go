@@ -1,4 +1,4 @@
-package primitive
+package shape
 
 import (
 	"fmt"
@@ -6,25 +6,28 @@ import (
 
 	"github.com/fogleman/gg"
 	"github.com/golang/freetype/raster"
+
+	"github.com/loyality7/primitive/primitive/internal/num"
+	"github.com/loyality7/primitive/primitive/rasterize"
 )
 
 type Polygon struct {
-	Worker *Worker
+	Env    *Env
 	Order  int
 	Convex bool
 	X, Y   []float64
 }
 
-func NewRandomPolygon(worker *Worker, order int, convex bool) *Polygon {
-	rnd := worker.Rnd
+func NewRandomPolygon(env *Env, order int, convex bool) *Polygon {
+	rnd := env.Rnd
 	x := make([]float64, order)
 	y := make([]float64, order)
-	x[0], y[0] = worker.RandomPointF()
+	x[0], y[0] = env.RandomPointF()
 	for i := 1; i < order; i++ {
 		x[i] = x[0] + rnd.Float64()*40 - 20
 		y[i] = y[0] + rnd.Float64()*40 - 20
 	}
-	p := &Polygon{worker, order, convex, x, y}
+	p := &Polygon{env, order, convex, x, y}
 	p.Mutate()
 	return p
 }
@@ -61,9 +64,9 @@ func (p *Polygon) Copy() Shape {
 
 func (p *Polygon) Mutate() {
 	const m = 16
-	w := p.Worker.W
-	h := p.Worker.H
-	rnd := p.Worker.Rnd
+	w := p.Env.W
+	h := p.Env.H
+	rnd := p.Env.Rnd
 	for {
 		if rnd.Float64() < 0.25 {
 			i := rnd.Intn(p.Order)
@@ -71,8 +74,8 @@ func (p *Polygon) Mutate() {
 			p.X[i], p.Y[i], p.X[j], p.Y[j] = p.X[j], p.Y[j], p.X[i], p.Y[i]
 		} else {
 			i := rnd.Intn(p.Order)
-			p.X[i] = clamp(p.X[i]+rnd.NormFloat64()*16, -m, float64(w-1+m))
-			p.Y[i] = clamp(p.Y[i]+rnd.NormFloat64()*16, -m, float64(h-1+m))
+			p.X[i] = num.Clamp(p.X[i]+rnd.NormFloat64()*16, -m, float64(w-1+m))
+			p.Y[i] = num.Clamp(p.Y[i]+rnd.NormFloat64()*16, -m, float64(h-1+m))
 		}
 		if p.Valid() {
 			break
@@ -107,15 +110,15 @@ func cross3(x1, y1, x2, y2, x3, y3 float64) float64 {
 	return dx1*dy2 - dy1*dx2
 }
 
-func (p *Polygon) Rasterize() []Scanline {
+func (p *Polygon) Rasterize() []rasterize.Scanline {
 	var path raster.Path
 	for i := 0; i <= p.Order; i++ {
-		f := fixp(p.X[i%p.Order], p.Y[i%p.Order])
+		f := rasterize.Fixp(p.X[i%p.Order], p.Y[i%p.Order])
 		if i == 0 {
 			path.Start(f)
 		} else {
 			path.Add1(f)
 		}
 	}
-	return fillPath(p.Worker, path)
+	return p.Env.Fill(path)
 }

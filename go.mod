@@ -1,6 +1,6 @@
 module github.com/loyality7/primitive
 
-go 1.27.0
+go 1.26.0
 
 require (
 	github.com/fogleman/gg v1.3.0
