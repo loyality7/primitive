@@ -66,7 +66,7 @@ Tip: for detail, such as the curve of a smile, raise the shape count and the wor
 
 ### Web version
 
-`web/index.html` opens with two choices. **Photo** turns a picture into art with every style. **Live camera** runs the real shapes engine on your camera: the shapes stay on screen, every frame they are recolored to fit you, new shapes are added where you move and the weakest old ones are dropped, so the painted picture follows you with a short delay. It runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated), PNG or an animated GIF. Build the engine once, then serve the `web/` folder with any static file server:
+`web/index.html` opens with two choices. **Photo** turns a picture into art with every style. **Live camera** has the same Style menu. The fast styles (squares, circles, triangles, low-poly) draw a fresh picture every frame. **Shapes** runs the real shapes engine on your camera: the shapes stay on screen, every frame they are recolored to fit you, new shapes are added where you move and the weakest old ones are dropped, so the painted picture follows you with a short delay. It runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated), PNG or an animated GIF. Build the engine once, then serve the `web/` folder with any static file server:
 
 ```
 GOOS=js GOARCH=wasm go build -o web/primitive.wasm ./cmd/wasm

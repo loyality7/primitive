@@ -102,7 +102,7 @@
       <div id="styleRow">
       <label for="algo">Style</label>
       <select id="algo">
-        <option value="shapes">Shapes (best quality, slow)</option>
+        <option value="shapes">Shapes (the painted look)</option>
         <option value="quads">Squares (fast)</option>
         <option value="circles">Circles (fast)</option>
         <option value="triangles">Triangles (fast)</option>
@@ -462,7 +462,8 @@ function cameraError(e) {
 }
 
 // a change of any of these starts the live picture again from the current frame
-const liveSettings = () => [$("shape").value, $("detail").value, $("effort").value, $("palette").value, $("edge").checked].join("|");
+const liveSettings = () => [$("algo").value, $("shape").value, $("detail").value, $("effort").value, $("palette").value, $("edge").checked,
+  $("outline").checked, $("algo").value === "lowpoly" ? $("count").value : ""].join("|");
 
 async function startCamera() {
   setError("");
@@ -500,32 +501,41 @@ function grabFrame(l) {
   return l.wctx.getImageData(0, 0, l.w, l.h).data;
 }
 
-// (re)start every copy of the engine from the current frame with the current settings
+// (re)start the engine from the current frame with the current settings: every
+// copy for Shapes, a single fast engine for squares, circles, triangles and low-poly
 async function restartLive(l) {
   const sc = Number($("detail").value) / Math.max(l.video.videoWidth, l.video.videoHeight);
   const w = Math.max(8, Math.round(l.video.videoWidth * sc)), h = Math.max(8, Math.round(l.video.videoHeight * sc));
   const [cand, rest] = $("effort").value.split(",").map(Number);
   l.settings = liveSettings();
-  const keep = { w: l.w, h: l.h };
+  const keep = { w: l.w, h: l.h, fast: l.fast, size: size };
+  const fast = quads();
   l.w = w; l.h = h; l.work.width = w; l.work.height = h;
-  await ensureThreads(THREADS);
   const data = grabFrame(l);
-  const seed = Math.floor(Math.random() * 1e9);
-  const all = await Promise.all(pool.map((p, i) =>
-    p.call("initFrame", data, w, h, OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest, seed + i)));
+  let bad = null, out = { w, h };
+  if (fast) {
+    const r = await pool[0].call("liveInit", w, h, OUT, $("outline").checked ? 1 : 0, cell(), $("palette").value, Number($("count").value) || 1500);
+    bad = r.error ? r : null;
+    out = { w: r.width, h: r.height };
+  } else {
+    await ensureThreads(THREADS);
+    const seed = Math.floor(Math.random() * 1e9);
+    const all = await Promise.all(pool.map((p, i) =>
+      p.call("initFrame", data, w, h, OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest, seed + i)));
+    bad = all.find((x) => x.error) || null;
+    l.each = Math.max(1, Math.ceil(rest / pool.length)); // restarts each copy takes in a search
+  }
   if (live !== l) return;
-  const bad = all.find((x) => x.error);
   if (bad) {
     if (!l.inited) throw new Error(bad.error);
     setError(bad.error); // the old settings keep running
-    l.w = keep.w; l.h = keep.h; l.work.width = keep.w; l.work.height = keep.h;
+    l.w = keep.w; l.h = keep.h; l.fast = keep.fast; l.work.width = keep.w; l.work.height = keep.h; size = keep.size;
     return;
   }
   setError("");
-  l.inited = true;
-  l.each = Math.max(1, Math.ceil(rest / pool.length)); // restarts each copy takes in a search
-  size = { w, h };
-  $("canvas").width = w; $("canvas").height = h;
+  l.inited = true; l.fast = fast;
+  size = out;
+  $("canvas").width = out.w; $("canvas").height = out.h;
 }
 
 async function liveLoop(l) {
@@ -534,27 +544,36 @@ async function liveLoop(l) {
     while (live === l) {
       if (l.settings !== liveSettings()) { await restartLive(l); if (live !== l) return; }
       const data = grabFrame(l);
-      const cap = Math.max(10, Math.min(1000, Number($("count").value) || 120));
-      // 1. every copy takes the new frame and recolors its shapes to fit it
-      const targets = await Promise.all(pool.map((p) => p.call("setTarget", data, Number($("steady").value) / 100)));
-      if (live !== l) return;
-      if (targets.some((t) => t.error)) throw new Error(targets.find((t) => t.error).error);
-      // 2. every copy looks for a new shape, the best one goes into all of them
-      const found = await Promise.all(pool.map((p) => p.call("search", Number($("shape").value), 128, l.each)));
-      if (live !== l) return;
-      if (found.some((f) => f.error)) throw new Error(found.find((f) => f.error).error);
-      const best = found.reduce((a, b) => (b.energy < a.energy ? b : a));
-      const applied = await Promise.all(pool.map((p) => p.call("apply", best.type, best.params, best.alpha, cap)));
-      if (live !== l) return;
-      if (applied.some((a) => a.error)) throw new Error(applied.find((a) => a.error).error);
-      // 3. draw
-      const px = await pool[0].call("shapesPixels");
-      if (live !== l) return;
+      let px, info;
+      if (l.fast) {
+        // squares, circles, triangles, low-poly: a fresh picture for every frame
+        const splits = Math.max(20, Math.min(20000, Number($("count").value) || 1000));
+        const r = await pool[0].call("liveFrame", data, Number($("steady").value) / 100, splits);
+        if (live !== l) return;
+        if (r.error) throw new Error(r.error);
+        px = r.pixels; info = `${r.leaves} cells`;
+      } else {
+        // Shapes: the shapes stay, they are recolored for this frame and one new shape is added
+        const cap = Math.max(10, Math.min(1000, Number($("count").value) || 120));
+        const targets = await Promise.all(pool.map((p) => p.call("setTarget", data, Number($("steady").value) / 100)));
+        if (live !== l) return;
+        if (targets.some((t) => t.error)) throw new Error(targets.find((t) => t.error).error);
+        const found = await Promise.all(pool.map((p) => p.call("search", Number($("shape").value), 128, l.each)));
+        if (live !== l) return;
+        if (found.some((f) => f.error)) throw new Error(found.find((f) => f.error).error);
+        const best = found.reduce((a, b) => (b.energy < a.energy ? b : a));
+        const applied = await Promise.all(pool.map((p) => p.call("apply", best.type, best.params, best.alpha, cap)));
+        if (live !== l) return;
+        if (applied.some((a) => a.error)) throw new Error(applied.find((a) => a.error).error);
+        px = await pool[0].call("shapesPixels");
+        if (live !== l) return;
+        info = `${applied[0].shapes} shapes · ${pool.length} threads`;
+      }
       ctx.putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, px.length), size.w, size.h), 0, 0);
       const now = performance.now();
       l.fps = l.fps ? l.fps * 0.8 + 0.2 * (1000 / (now - last)) : 1000 / (now - last);
       last = now;
-      $("status").textContent = `Live · ${l.fps.toFixed(0)} updates per second · ${applied[0].shapes} shapes · ${pool.length} threads` +
+      $("status").textContent = `Live · ${l.fps.toFixed(0)} ${l.fast ? "fps" : "updates per second"} · ${info}` +
         (rec ? ` · recording ${Math.max(0, 3 - (now - rec.t0) / 1000).toFixed(0)} s` : "");
       if (rec) recordFrame(px, now);
       await nextFrame(l.video);
@@ -601,13 +620,16 @@ async function enterMode(m) {
   $("home").hidden = true; $("app").hidden = false;
   $("photoBox").hidden = $("photoRun").hidden = cam;
   $("camBox").hidden = !cam;
-  $("styleRow").hidden = cam; // the camera uses the real shapes engine, there is no style to pick
-  setStyles(cam ? [["shapes", "Shapes"]] : ALL_STYLES);
+  $("styleRow").hidden = false;
+  setStyles(ALL_STYLES);
   applyStyle();
   setError("");
   if (cam) {
-    $("detail").value = "128"; $("effort").value = "100,3"; $("count").value = 120; // small and quick suits video
-    $("countHint").textContent = "How many shapes stay on screen. Fewer is more abstract, more shows detail.";
+    $("detail").value = "128"; $("effort").value = "100,3"; // small and quick suits video
+    if ($("algo").value === "shapes") {
+      $("count").value = 120;
+      $("countHint").textContent = "How many shapes stay on screen. Fewer is more abstract, more shows detail.";
+    }
     $("status").textContent = "Starting the camera...";
     while (!ready) await sleep(50);
     await startCamera();
@@ -647,11 +669,7 @@ function applyStyle() {
 $("algo").onchange = () => {
   applyStyle();
   if (!live) return;
-  if ($("algo").value === "shapes") { // the shapes engine cannot keep up with video: show the nearest live look
-    $("algo").value = "lowpoly"; applyStyle();
-    setError("Shapes need seconds per picture, so live view uses Low-poly triangles. Use Refine with shapes for the real thing.");
-  }
-  live.dirty = true;
+  live.dirty = true; // settings are checked every frame, this just makes it explicit
 };
 for (const id of ["outline", "palette", "detail"]) $(id).addEventListener("change", () => { if (live) live.dirty = true; });
 
