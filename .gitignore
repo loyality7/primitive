@@ -9,3 +9,5 @@
 /bin/
 /web/primitive.wasm
 /web/wasm_exec.js
+
+/dist/

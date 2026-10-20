@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/loyality7/primitive/releases/latest"><img src="https://img.shields.io/github/v/release/loyality7/primitive?style=flat-square&label=Release" alt="Latest Release" /></a>
   <a href="https://loyality7.github.io/primitive/"><img src="https://img.shields.io/badge/Demo-Online%20WebAssembly-blue?style=flat-square" alt="Online Demo" /></a>
   <img src="https://img.shields.io/badge/Language-Go-00ADD8?style=flat-square&logo=go" alt="Language: Go" />
   <img src="https://img.shields.io/badge/Platform-CLI%20%7C%20WebAssembly-654FF0?style=flat-square" alt="Platform" />
