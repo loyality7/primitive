@@ -74,7 +74,7 @@ cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/
 python -m http.server 8000     # then open http://localhost:8000/web/
 ```
 
-Hosting it needs only `index.html`, `wasm_exec.js` and `primitive.wasm`; Go is not needed on the server. The browser build uses one thread, so it is slower than the command line. The `tests/wasm/` scripts check it end to end in Node (`node tests/wasm/e2e.mjs`).
+Hosting it needs only `index.html`, `wasm_exec.js` and `primitive.wasm`; Go is not needed on the server. The page runs the engine in Web Workers, so the page stays responsive while it works. For shapes it starts up to 6 workers (one per core): each searches for the next shape on its own copy of the picture, the best shape is applied to all copies, and the copies stay identical. On a 12 core machine that was about 2 to 3 times faster than one thread. Add `?threads=1` (or another number up to 6) to the address to change it. The `tests/wasm/` scripts check the browser build in Node: `e2e.mjs` for the features and `parallel.mjs` for the multi-thread protocol and its speed-up.
 
 ### Quadtree mode
 

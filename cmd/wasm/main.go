@@ -64,7 +64,7 @@ func decode(args []js.Value) (image.Image, string) {
 	return img, ""
 }
 
-// init(bytes, workingSize, outputSize, palette, edge[, candidates, restarts]) -> {width, height} | {error}
+// init(bytes, workingSize, outputSize, palette, edge[, candidates, restarts, seed]) -> {width, height} | {error}
 func initModel(_ js.Value, args []js.Value) any {
 	if len(args) < 5 {
 		return fail("init needs 5 arguments")
@@ -79,7 +79,11 @@ func initModel(_ js.Value, args []js.Value) any {
 	}
 	bg := colors.MakeColor(imageio.AverageImageColor(img))
 	qmodel = nil
-	model = primitive.NewModel(img, bg, args[2].Int(), 1, time.Now().UnixNano())
+	seed := time.Now().UnixNano()
+	if len(args) >= 8 {
+		seed = int64(args[7].Int())
+	}
+	model = primitive.NewModel(img, bg, args[2].Int(), 1, seed)
 	model.SetPalette(palette)
 	model.SetEdgeBias(args[4].Float())
 	if len(args) >= 7 {
@@ -114,6 +118,39 @@ func step(_ js.Value, args []js.Value) any {
 		return fail("call init first")
 	}
 	model.Step(shape.Type(args[0].Int()), args[1].Int(), 0)
+	return map[string]any{"shapes": len(model.Shapes), "score": model.Score}
+}
+
+// search(shapeType, alpha, restarts) looks for the next shape but does not add
+// it -> {type, params, alpha, energy} | {error}. Several copies of the same
+// picture can search at once; apply then adds the best result to all of them.
+func search(_ js.Value, args []js.Value) any {
+	if model == nil {
+		return fail("call init first")
+	}
+	state := model.Search(shape.Type(args[0].Int()), args[1].Int(), args[2].Int())
+	typ, params := shape.Encode(state.Shape)
+	list := make([]any, len(params))
+	for i, p := range params {
+		list[i] = p
+	}
+	return map[string]any{"type": int(typ), "params": list, "alpha": state.Alpha, "energy": state.Energy()}
+}
+
+// apply(type, params, alpha) adds a shape found by search -> {shapes, score} | {error}
+func apply(_ js.Value, args []js.Value) any {
+	if model == nil {
+		return fail("call init first")
+	}
+	p := make([]float64, args[1].Length())
+	for i := range p {
+		p[i] = args[1].Index(i).Float()
+	}
+	sh, err := shape.Decode(model.Workers[0].Env, shape.Type(args[0].Int()), p)
+	if err != nil {
+		return fail(err.Error())
+	}
+	model.Add(sh, args[2].Int())
 	return map[string]any{"shapes": len(model.Shapes), "score": model.Score}
 }
 
@@ -193,6 +230,8 @@ func main() {
 		"init":      js.FuncOf(initModel),
 		"initQuads": js.FuncOf(initQuads),
 		"step":      js.FuncOf(step),
+		"search":    js.FuncOf(search),
+		"apply":     js.FuncOf(apply),
 		"stepQuads": js.FuncOf(stepQuads),
 		"pixels":    js.FuncOf(pixels),
 		"svg":       js.FuncOf(svg),

@@ -148,17 +148,21 @@
   <footer>Based on <a href="https://github.com/fogleman/primitive">primitive</a> by Michael Fogleman (MIT). Fork and source: <a href="https://github.com/loyality7/primitive">loyality7/primitive</a>.</footer>
 </main>
 
-<script src="wasm_exec.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const OUT = 512;
-let P = null;            // engine, set once the wasm is loaded
+// The Balanced preset has 6 restarts to share out, so more threads than that would sit idle.
+// ?threads=N in the address overrides the count.
+const THREADS = Math.max(1, Math.min(6, Number(new URLSearchParams(location.search).get("threads")) || navigator.hardwareConcurrency || 4));
+let ready = false;       // the engine is compiled and the first worker is running
 let imageBytes = null;   // current photo
 let started = false;     // a run exists (controls locked until Reset)
 let running = false;
 let done = 0, target = 0, size = { w: OUT, h: OUT };
 let msTotal = 0;
 let leaves = 1;          // quads: squares drawn so far
+let runId = 0;           // changes on every start and reset, so an old loop knows to stop
+let lastDraw = 0;
 const quads = () => $("algo").value !== "shapes"; // squares or circles
 const circles = () => $("algo").value === "circles";
 
@@ -166,23 +170,73 @@ const ctx = $("canvas").getContext("2d");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const setError = (m) => { $("error").textContent = m || ""; };
 
-async function loadEngine() {
-  const go = new Go();
-  let inst;
-  try {
-    inst = (await WebAssembly.instantiateStreaming(fetch("primitive.wasm"), go.importObject)).instance;
-  } catch (e) { // server without the wasm mime type
-    const buf = await (await fetch("primitive.wasm")).arrayBuffer();
-    inst = (await WebAssembly.instantiate(buf, go.importObject)).instance;
-  }
-  go.run(inst);
-  for (let i = 0; i < 100 && !window.primitive; i++) await sleep(20);
-  if (!window.primitive) throw new Error("engine did not start");
-  P = window.primitive;
+// ---- engine ----
+// Each worker thread runs its own copy of the wasm engine. pool[0] holds the
+// picture that is drawn and exported. For shapes every worker searches at the
+// same time, the best shape is applied to all of them, so they stay identical.
+let wasmModule = null, workerUrl = null;
+const pool = [];
+
+function workerMain() { // runs inside every worker, after wasm_exec.js
+  let P = null;
+  onmessage = async (e) => {
+    const { id, fn, args } = e.data;
+    try {
+      if (fn === "boot") {
+        const go = new Go();
+        go.run(await WebAssembly.instantiate(args[0], go.importObject));
+        for (let i = 0; i < 100 && !self.primitive; i++) await new Promise((r) => setTimeout(r, 20));
+        P = self.primitive;
+        postMessage({ id, result: true });
+        return;
+      }
+      const result = P[fn](...args);
+      postMessage({ id, result }, result instanceof Uint8Array ? [result.buffer] : []);
+    } catch (err) {
+      postMessage({ id, error: String(err) });
+    }
+  };
 }
 
+function spawn() {
+  const w = new Worker(workerUrl);
+  const h = { w, next: 1, pending: new Map() };
+  w.onmessage = (e) => {
+    const { id, result, error } = e.data;
+    const p = h.pending.get(id);
+    h.pending.delete(id);
+    if (p) error ? p.reject(new Error(error)) : p.resolve(result);
+  };
+  w.onerror = (e) => { for (const p of h.pending.values()) p.reject(new Error(e.message || "worker failed")); h.pending.clear(); };
+  h.call = (fn, ...args) => new Promise((resolve, reject) => {
+    const id = h.next++;
+    h.pending.set(id, { resolve, reject });
+    w.postMessage({ id, fn, args });
+  });
+  pool.push(h);
+  return h.call("boot", wasmModule);
+}
+
+async function loadEngine() {
+  const [exec, module] = await Promise.all([
+    fetch("wasm_exec.js").then((r) => r.text()),
+    WebAssembly.compileStreaming(fetch("primitive.wasm")).catch(async () => // a server without the wasm mime type
+      WebAssembly.compile(await (await fetch("primitive.wasm")).arrayBuffer())),
+  ]);
+  wasmModule = module;
+  // workers start from this blob, so spawning more later needs no network
+  workerUrl = URL.createObjectURL(new Blob([exec, "\n(", workerMain.toString(), ")();"], { type: "text/javascript" }));
+  await spawn();
+  ready = true;
+}
+
+async function ensureThreads(n) {
+  await Promise.all(Array.from({ length: Math.max(0, n - pool.length) }, spawn));
+}
+
+// ---- page ----
 function refresh() {
-  $("go").disabled = !P || !imageBytes || (started && done >= target);
+  $("go").disabled = !ready || !imageBytes || (started && done >= target);
   $("go").textContent = running ? "Pause" : (started && done < target ? "Resume" : "Start");
   $("reset").disabled = !started;
   const has = started && done > 0;
@@ -197,16 +251,17 @@ function status() {
   $("progress").style.width = target ? (100 * done / target) + "%" : "0";
   const text = quads()
     ? `${done} of ${target} splits · ${leaves} squares`
-    : `${done} of ${target} shapes` + (per ? ` · ${per} ms per shape` : "");
+    : `${done} of ${target} shapes` + (per ? ` · ${per} ms per shape` : "") + (pool.length > 1 ? ` · ${pool.length} threads` : "");
   $("status").textContent = started
     ? text + (done >= target ? " · done" : "")
     : (imageBytes ? "Ready. Press Start." : "Pick a photo to begin.");
 }
 
-function draw() {
-  const px = P.pixels();
+async function draw() {
+  const px = await pool[0].call("pixels");
   if (px.error) return setError(px.error);
-  ctx.putImageData(new ImageData(new Uint8ClampedArray(px), size.w, size.h), 0, 0);
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, px.length), size.w, size.h), 0, 0);
+  lastDraw = performance.now();
 }
 
 async function takePhoto(file) {
@@ -229,10 +284,14 @@ async function takePhoto(file) {
 async function begin() {
   let r;
   if (quads()) {
-    r = P.initQuads(imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, circles());
+    r = await pool[0].call("initQuads", imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, circles());
   } else {
     const [cand, rest] = $("effort").value.split(",").map(Number);
-    r = P.init(imageBytes, Number($("detail").value), OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest);
+    await ensureThreads(THREADS);
+    const seed = Math.floor(Math.random() * 1e9);
+    const all = await Promise.all(pool.map((p, i) =>
+      p.call("init", imageBytes, Number($("detail").value), OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest, seed + i)));
+    r = all.find((x) => x.error) || all[0];
   }
   if (r.error) { setError(r.error); return false; }
   size = { w: r.width, h: r.height };
@@ -244,36 +303,54 @@ async function begin() {
 }
 
 async function loop() {
+  const id = ++runId;
   running = true; refresh();
-  const batch = Math.max(1, Math.ceil(target / 120)); // quads: about 120 repaints per run
-  while (running && done < target) {
-    const t = performance.now();
-    if (quads()) {
-      const r = P.stepQuads(Math.min(batch, target - done));
-      if (r.error) { setError(r.error); break; }
-      done += r.splits; leaves = r.leaves;
-      if (r.finished) done = target; // nothing left to split: the picture is exact
-    } else {
-      const r = P.step(Number($("shape").value), 128);
-      if (r.error) { setError(r.error); break; }
-      done = r.shapes;
+  try {
+    const batch = Math.max(1, Math.ceil(target / 120)); // quads: about 120 repaints per run
+    const restarts = Number($("effort").value.split(",")[1]);
+    const each = Math.max(1, Math.ceil(restarts / pool.length)); // restarts each worker takes
+    while (running && id === runId && done < target) {
+      const t = performance.now();
+      if (quads()) {
+        const r = await pool[0].call("stepQuads", Math.min(batch, target - done));
+        if (r.error) throw new Error(r.error);
+        done += r.splits; leaves = r.leaves;
+        if (r.finished) done = target; // nothing left to split: the picture is exact
+      } else {
+        const found = await Promise.all(pool.map((p) => p.call("search", Number($("shape").value), 128, each)));
+        const bad = found.find((f) => f.error);
+        if (bad) throw new Error(bad.error);
+        const best = found.reduce((a, b) => (b.energy < a.energy ? b : a));
+        const applied = await Promise.all(pool.map((p) => p.call("apply", best.type, best.params, best.alpha)));
+        const err = applied.find((a) => a.error);
+        if (err) throw new Error(err.error);
+        done = applied[0].shapes;
+      }
+      if (id !== runId) return; // reset while we were waiting
+      msTotal += performance.now() - t;
+      if (performance.now() - lastDraw > 40 || done >= target) await draw();
+      status(); refresh();
     }
-    msTotal += performance.now() - t;
-    draw(); status(); refresh();
-    await sleep(0); // let the browser paint and handle clicks
+    if (id === runId && done > 0) await draw(); // show the latest picture when paused
+  } catch (e) {
+    setError(e.message);
   }
-  running = false; refresh(); status();
+  if (id === runId) { running = false; refresh(); status(); }
 }
 
 $("go").onclick = async () => {
   setError("");
   if (running) { running = false; return; }
-  if (!started && !(await begin())) return;
+  if (!started) {
+    $("go").disabled = true; $("status").textContent = "Starting...";
+    const ok = await begin();
+    if (!ok) { status(); refresh(); return; }
+  }
   loop();
 };
 
 $("reset").onclick = () => {
-  running = false; started = false; done = 0; target = 0;
+  runId++; running = false; started = false; done = 0; target = 0;
   if (imageBytes) takePhoto(new File([imageBytes], $("picked").textContent));
   status(); refresh();
 };
@@ -284,10 +361,10 @@ function save(name, data, type) {
   a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-function saveSVG(anim) {
+async function saveSVG(anim) {
   // shapes: 0.06 s apart. squares have far more splits, so fit them in about 8 seconds.
   const step = quads() ? Math.max(0.002, Math.min(0.06, 8 / Math.max(1, done))) : 0.06;
-  const svg = P.svg(anim ? step : 0, 0);
+  const svg = await pool[0].call("svg", anim ? step : 0, 0);
   if (typeof svg !== "string") return setError(svg.error || "Nothing to export yet.");
   save(anim ? "primitive-animated.svg" : "primitive.svg", svg, "image/svg+xml");
 }
@@ -296,14 +373,14 @@ $("dlanim").onclick = () => saveSVG(true);
 $("dlgif").onclick = async () => {
   const btn = $("dlgif");
   btn.disabled = true; btn.textContent = "Making GIF...";
-  await sleep(30); // let the browser repaint before the encoder takes the thread
-  const gif = P.gif(8, 200);
+  await sleep(30); // let the browser repaint first
+  const gif = await pool[0].call("gif", 8, 200);
   btn.textContent = "Download GIF"; refresh();
   if (gif.error) return setError(gif.error);
   save("primitive.gif", gif, "image/gif");
 };
-$("dlpng").onclick = () => {
-  const png = P.png();
+$("dlpng").onclick = async () => {
+  const png = await pool[0].call("png");
   if (png.error) return setError(png.error);
   save("primitive.png", png, "image/png");
 };

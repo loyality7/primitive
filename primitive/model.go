@@ -232,3 +232,12 @@ func (model *Model) SetEffort(candidates, restarts int) {
 
 // Image returns the picture drawn so far.
 func (model *Model) Image() image.Image { return model.Context.Image() }
+
+// Search looks for a good next shape with the first worker only and does not
+// add it. Several models of the same picture can search at the same time and
+// then all add the best shape, which keeps them identical.
+func (model *Model) Search(t shape.Type, alpha, restarts int) *State {
+	w := model.Workers[0]
+	w.Init(model.Current, model.Score)
+	return w.BestHillClimbState(t, alpha, model.Candidates, 100, restarts)
+}
