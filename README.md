@@ -1,4 +1,19 @@
-# Primitive Pictures
+<p align="center">
+  <img src="docs/logo-anim.svg" width="160" height="160" alt="Primitive Logo" />
+</p>
+
+<h1 align="center">Primitive</h1>
+
+<p align="center">
+  Reproduce images with geometric primitives.
+</p>
+
+<p align="center">
+  <a href="https://loyality7.github.io/primitive/"><img src="https://img.shields.io/badge/Demo-Online%20WebAssembly-blue?style=flat-square" alt="Online Demo" /></a>
+  <img src="https://img.shields.io/badge/Language-Go-00ADD8?style=flat-square&logo=go" alt="Language: Go" />
+  <img src="https://img.shields.io/badge/Platform-CLI%20%7C%20WebAssembly-654FF0?style=flat-square" alt="Platform" />
+  <a href="./LICENSE.md"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License: MIT" /></a>
+</p>
 
 > **Credit.** This project is based on [primitive](https://github.com/fogleman/primitive) by [Michael Fogleman](https://github.com/fogleman), released under the MIT license (see [LICENSE.md](LICENSE.md)). The core algorithm and the original code are his. The idea was inspired by Roger Johansson's [Genetic Programming: Evolution of Mona Lisa](https://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/).
 
