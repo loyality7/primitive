@@ -17,3 +17,6 @@ quads-noborder|-algo quads -border 0|56d434f8531ca37dc766656da97d4fd4e9b41063cbd
 quads-circles|-algo quads -cell circle|1864b837883f0b1d1741bd3db6589681f2e1e65e21ad25370a84abfcac08fee0
 quads-anim|-algo quads -anim 0.01|de743772c9dadb4671be777cee0e49b44544db419e33de77ec9f756f1ba599bd
 quads-circles-anim|-algo quads -cell circle -anim 0.01|77a91c8f91966d8c937c06fb7804704ff26e0a6c699d48baf10c618306e85d79
+quads-triangles|-algo quads -cell triangle|a17210ae9fb686e5f40744d0816f030eeeb7d33fd223f4b8c4a15762583155bb
+quads-triangles-anim|-algo quads -cell triangle -anim 0.01|b3d399ccb72493d5aa673898091f3e17e11854a7fa6a097260448285a740aa04
+quads-palette|-algo quads -border 0 -palette #101010,#e8d9a0,#c0392b,#2d5a27|018ecd7f196390587c54e013e2fe2dcad6ee47c184b2fee49902e6d76abfb5a3

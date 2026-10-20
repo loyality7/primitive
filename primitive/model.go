@@ -30,6 +30,10 @@ type Model struct {
 	Colors         []colors.Color
 	Scores         []float64
 	Workers        []*Worker
+
+	avg     []float32   // running average of the target frames, for live video
+	gains   []float64   // how much each shape improved the picture at the last Recolor
+	scratch *image.RGBA // working space for Recolor
 }
 
 func NewModel(target image.Image, background colors.Color, size, numWorkers int, seed int64) *Model {
@@ -138,6 +142,9 @@ func (model *Model) Add(sh shape.Shape, alpha int) {
 	drawLines(model.Current, color, lines)
 	score := differencePartial(model.Target, before, model.Current, model.Score, lines)
 
+	if len(model.gains) == len(model.Shapes) { // keep the list for Prune up to date
+		model.gains = append(model.gains, model.Score-score)
+	}
 	model.Score = score
 	model.Shapes = append(model.Shapes, sh)
 	model.Colors = append(model.Colors, color)

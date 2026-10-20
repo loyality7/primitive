@@ -90,16 +90,16 @@ func TestGoldenOutputs(t *testing.T) {
 func TestCLIRejectsBadInput(t *testing.T) {
 	bin, dir := buildCLI(t)
 	cases := map[string][]string{
-		"bad palette":   {"-palette", "zzz", "-n", "2"},
-		"bad quality":   {"-quality", "bogus"},
-		"negative blur": {"-blur", "-1", "-n", "2"},
-		"no count":      {},
-		"quads palette": {"-algo", "quads", "-palette", "#fff", "-n", "5"},
-		"quads shape":   {"-algo", "quads", "-m", "3", "-n", "5"},
-		"unknown algo":  {"-algo", "bogus", "-n", "5"},
-		"bad cell":      {"-algo", "quads", "-cell", "triangle", "-n", "5"},
-		"border shapes": {"-m", "1", "-border", "2", "-n", "5"},
-		"bad border":    {"-algo", "quads", "-border", "-1", "-n", "5"},
+		"bad palette":       {"-palette", "zzz", "-n", "2"},
+		"bad quality":       {"-quality", "bogus"},
+		"negative blur":     {"-blur", "-1", "-n", "2"},
+		"no count":          {},
+		"quads bad palette": {"-algo", "quads", "-palette", "zzz", "-n", "5"},
+		"quads shape":       {"-algo", "quads", "-m", "3", "-n", "5"},
+		"unknown algo":      {"-algo", "bogus", "-n", "5"},
+		"bad cell":          {"-algo", "quads", "-cell", "hexagon", "-n", "5"},
+		"border shapes":     {"-m", "1", "-border", "2", "-n", "5"},
+		"bad border":        {"-algo", "quads", "-border", "-1", "-n", "5"},
 	}
 	for name, args := range cases {
 		full := append([]string{"-i", "../examples/owl.png", "-o", filepath.Join(dir, "x.svg")}, args...)

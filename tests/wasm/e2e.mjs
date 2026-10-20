@@ -179,6 +179,113 @@ test("gif export for shapes and for quads", () => {
   assert.ok(isGif(quads) && quads.length > 500, "quad gif");
 });
 
+test("quads: triangle cells and a palette", () => {
+  const r = P.initQuads(owl, 128, 128, 1, "triangle");
+  assert.equal(r.error, undefined);
+  const s = P.stepQuads(30);
+  const svg = P.svg(0, 0);
+  assert.equal((svg.match(/<polygon/g) || []).length, 2 * s.leaves);
+  assert.ok(!svg.includes("<rect") && svg.includes("rect,polygon{stroke"));
+  const pal = ["#101010", "#e8d9a0"];
+  P.initQuads(owl, 128, 128, 0, "square", pal.join(","));
+  P.stepQuads(40);
+  for (const m of P.svg(0, 0).matchAll(/fill="(#[0-9a-f]{6})"/g)) assert.ok(pal.includes(m[1]), `${m[1]} is not in the palette`);
+  assert.match(P.initQuads(owl, 128, 128, 0, "square", "zzz").error, /invalid palette color/);
+});
+
+test("live frames: size, smoothing, styles and exports", () => {
+  const W = 64, H = 48;
+  const frame = (shift) => {
+    const px = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const o = (y * W + x) * 4;
+      px[o] = ((x + shift) * 4) % 256; px[o + 1] = y * 5; px[o + 2] = 120; px[o + 3] = 255;
+    }
+    return px;
+  };
+  const r = P.liveInit(W, H, 128, 1, "square");
+  assert.equal(r.error, undefined);
+  assert.equal(r.width, 128);
+  assert.equal(r.height, 96);
+  let out = P.liveFrame(frame(0), 0.5, 200);
+  assert.equal(out.error, undefined);
+  assert.equal(out.pixels.length, 128 * 96 * 4);
+  // 3 new cells per split, a little fewer once cells are 1 pixel wide
+  assert.ok(out.leaves > 400 && out.leaves <= 601, `leaves ${out.leaves}`);
+  assert.ok(out.score > 0 && out.score < 0.5);
+  const first = out.score;
+  out = P.liveFrame(frame(9), 0.5, 200); // the next frame starts the tree again
+  assert.ok(out.leaves > 400 && out.leaves <= 601);
+  assert.ok(Math.abs(out.score - first) < 0.2);
+  assert.match(P.liveFrame(new Uint8ClampedArray(10), 0, 50).error, /needs \d+ bytes/);
+  // every cell style and a palette work on live frames
+  for (const cell of ["circle", "triangle"]) {
+    assert.equal(P.liveInit(W, H, 128, 1, cell, "#000000,#ffffff").error, undefined);
+    const f = P.liveFrame(frame(3), 0, 150);
+    assert.ok(f.leaves > 300 && f.leaves <= 451, `${cell}: leaves ${f.leaves}`);
+    assert.ok(f.pixels.length === 128 * 96 * 4);
+  }
+  // a live picture can be saved as PNG or SVG, but has no history for a GIF or an animation
+  P.liveInit(W, H, 128, 1, "square");
+  const lf = P.liveFrame(frame(0), 0, 100);
+  assert.deepEqual([...P.png().slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+  const svg = P.svg(0.5, 0);
+  assert.equal((svg.match(/<rect/g) || []).length, lf.leaves);
+  assert.ok(!svg.includes("animation"));
+  assert.match(P.gif(8, 100).error, /no history/);
+  assert.match(P.liveInit(4, 4, 64, 1, "square").error, /between 8 and 2048/);
+});
+
+test("gif from frames the page collected", () => {
+  const W = 32, H = 24, N = 4;
+  const all = new Uint8ClampedArray(W * H * 4 * N);
+  for (let f = 0; f < N; f++) for (let i = 0; i < W * H; i++) {
+    const o = (f * W * H + i) * 4;
+    all[o] = f * 60; all[o + 1] = (i % W) * 8; all[o + 2] = 90; all[o + 3] = 255;
+  }
+  const gif = P.gifFrames(all, W, H, N, 8, 100);
+  assert.equal(gif.error, undefined);
+  assert.equal(String.fromCharCode(...gif.slice(0, 6)), "GIF89a");
+  assert.match(P.gifFrames(all, W, H, N + 1, 8, 100).error, /expected 5 frames/);
+});
+
+test("live shapes: the engine kept alive between camera frames", () => {
+  const W = 64, H = 48, CAP = 5;
+  const frame = (shift) => {
+    const px = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const o = (y * W + x) * 4;
+      px[o] = ((x + shift * 7) * 4) % 256; px[o + 1] = (y * 5 + shift * 20) % 256; px[o + 2] = 120; px[o + 3] = 255;
+    }
+    return px;
+  };
+  const r = P.initFrame(frame(0), W, H, 128, "", 0, 100, 3, 7);
+  assert.equal(r.error, undefined);
+  assert.equal(r.width, W);
+  let applied;
+  for (let k = 0; k < 8; k++) {
+    const t = P.setTarget(frame(k), 0.4);
+    assert.equal(t.error, undefined);
+    const found = P.search(1, 128, 2);
+    assert.equal(found.error, undefined);
+    applied = P.apply(found.type, found.params, found.alpha, CAP);
+    assert.equal(applied.error, undefined);
+    assert.ok(applied.shapes <= CAP, `${applied.shapes} shapes, cap ${CAP}`);
+  }
+  assert.equal(applied.shapes, CAP);
+  const px = P.shapesPixels();
+  assert.equal(px.length, W * H * 4);
+  const distinct = new Set();
+  for (let i = 0; i < px.length; i += 40) distinct.add(px[i] + "," + px[i + 1]);
+  assert.ok(distinct.size > 5, "the live picture looks flat");
+  const svg = P.svg(0, 0);
+  assert.equal((svg.match(/<polygon/g) || []).length, CAP);
+  assert.deepEqual([...P.png().slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+  assert.match(P.gif(8, 100).error, /no history/);
+  assert.match(P.setTarget(new Uint8ClampedArray(10), 0).error, /needs \d+ bytes/);
+  assert.match(P.initFrame(frame(0), 4, 4, 128, "", 0, 100, 3, 1).error, /between 8 and 1024/);
+});
+
 test("quads: bad image bytes are rejected", () => {
   assert.match(P.initQuads(new Uint8Array([1, 2, 3]), 128, 256).error, /could not read image/);
 });

@@ -104,7 +104,7 @@ func init() {
 	flag.Float64Var(&Anim, "anim", 0, "animate SVG output: seconds between shapes (or splits) appearing (0 = static)")
 	flag.StringVar(&Algo, "algo", "shapes", "shapes (default) or quads: a quadtree that keeps splitting the worst square into four")
 	flag.IntVar(&Border, "border", 1, "quads only: width in output pixels of the dark outline around each square (0 = none)")
-	flag.StringVar(&Cell, "cell", "square", "quads only: draw each cell as a square or a circle")
+	flag.StringVar(&Cell, "cell", "square", "quads only: draw each cell as a square, a circle or two triangles")
 	flag.Float64Var(&Blur, "blur", 0, "SVG output only: gaussian blur radius in image pixels (0 = off)")
 	flag.StringVar(&Quality, "quality", "", "preset for -n and -r: draft (150 shapes, r256) or high (400 shapes, r512); explicit -n / -r win")
 	flag.Float64Var(&Edge, "edge", 0, "0-1: chance a shape is placed near high-detail areas (0 = uniform)")
@@ -168,8 +168,8 @@ func main() {
 	if Algo != "shapes" && Algo != "quads" {
 		ok = errorMessage("ERROR: algo must be shapes or quads")
 	}
-	if Cell != "square" && Cell != "circle" {
-		ok = errorMessage("ERROR: cell must be square or circle")
+	if Cell != "square" && Cell != "circle" && Cell != "triangle" {
+		ok = errorMessage("ERROR: cell must be square, circle or triangle")
 	}
 	if Border < 0 {
 		ok = errorMessage("ERROR: border must be >= 0")
@@ -184,7 +184,7 @@ func main() {
 	if Algo == "quads" {
 		flag.Visit(func(f *flag.Flag) {
 			switch f.Name {
-			case "m", "a", "rep", "bg", "palette", "edge", "blur", "seed", "j":
+			case "m", "a", "rep", "bg", "edge", "blur", "seed", "j":
 				ok = errorMessage("ERROR: -" + f.Name + " does not apply to -algo quads")
 			}
 		})
@@ -252,6 +252,9 @@ func main() {
 		qm.AnimStep = Anim
 		qm.Border = Border
 		qm.Circles = Cell == "circle"
+		qm.Triangles = Cell == "triangle"
+		qm.Palette = palette
+		qm.Restart() // fit the first cell the way the style needs
 		out, score = qm, qm.Score
 		step = func(shapeConfig) int {
 			if qm.Split() {

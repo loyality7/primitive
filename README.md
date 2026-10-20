@@ -55,7 +55,7 @@ Small input images should be used (like 256x256px). You don't need the detail an
 | `edge` | 0 | 0-1: chance a new shape is anchored near high-detail areas (Sobel edges). Off by default. Measured gain is small: about 1% lower error in detailed regions, none overall. |
 | `algo` | shapes | `shapes` (default) or `quads`. With `quads` the picture is built from squares, and `-n` is the number of splits (1000 to 3000 is a good range). The shape-only flags (`-m`, `-a`, `-rep`, `-bg`, `-palette`, `-edge`, `-blur`, `-seed`, `-j`) are rejected with `quads`. |
 | `border` | 1 | quads only: width in pixels of the dark outline around each square. 0 gives plain squares. |
-| `cell` | square | quads only: `square` or `circle`. |
+| `cell` | square | quads only: `square`, `circle` or `triangle` (two triangles per cell). |
 | `quality` | n/a | preset for `n` and `r`: `draft` (150 shapes, `r` 256) or `high` (400 shapes, `r` 512). An explicit `-n` or `-r` overrides the preset. `high` took about 27s on a 512px image. |
 | `blur` | 0 | SVG output only: gaussian blur radius in image pixels. Try 1 to 2; 4 is very soft. PNG and JPG are unaffected. |
 | `palette` | n/a | restrict shape colors to a comma-separated hex list, e.g. `#000000,#ff0000,#ffffff` |
@@ -66,7 +66,7 @@ Tip: for detail, such as the curve of a smile, raise the shape count and the wor
 
 ### Web version
 
-`web/index.html` runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated), PNG or an animated GIF. Build the engine once, then serve the `web/` folder with any static file server:
+`web/index.html` opens with two choices. **Photo** turns a picture into art with every style. **Live camera** runs the real shapes engine on your camera: the shapes stay on screen, every frame they are recolored to fit you, new shapes are added where you move and the weakest old ones are dropped, so the painted picture follows you with a short delay. It runs both engines in the browser through WebAssembly: pick a photo, choose shapes, squares or circles, watch the picture build, download SVG (also animated), PNG or an animated GIF. Build the engine once, then serve the `web/` folder with any static file server:
 
 ```
 GOOS=js GOARCH=wasm go build -o web/primitive.wasm ./cmd/wasm

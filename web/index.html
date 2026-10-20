@@ -26,6 +26,17 @@
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
   label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
   label:first-child { margin-top: 0; }
+  [hidden] { display: none !important; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 20px; }
+  @media (max-width: 680px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    display: block; width: 100%; text-align: left; padding: 30px 24px; border-radius: 12px; cursor: pointer;
+    background: var(--panel); border: 1.5px solid var(--line); color: var(--ink); font: inherit;
+  }
+  .card:hover, .card:focus-visible { border-color: var(--accent); }
+  .card b { display: block; font-size: 22px; margin-bottom: 6px; }
+  .card span { color: var(--muted); font-size: 14px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
   select, input[type=number], input[type=text] {
     width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px;
     background: var(--bg); color: var(--ink); font: inherit;
@@ -64,8 +75,21 @@
   <h1>Primitive Pictures</h1>
   <p class="sub">Rebuild a photo from simple shapes, squares or circles, one piece at a time. Runs offline in your browser.</p>
 
+  <div id="home">
+    <div class="cards">
+      <button class="card" id="modePhoto" type="button"><b>Photo</b><span>Pick a picture and turn it into art. All styles, including shapes. Save SVG, PNG or GIF.</span></button>
+      <button class="card" id="modeCam" type="button"><b>Live camera</b><span>See yourself redrawn live as squares, circles or triangles. Record a GIF.</span></button>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+  <div class="row" style="margin:0 0 12px"><button id="back" type="button">&larr; Back</button></div>
   <div class="layout">
     <section class="panel" aria-label="Settings">
+      <div id="camBox" hidden>
+        <button id="cam" class="primary" type="button" disabled>Start camera</button>
+      </div>
+      <div id="photoBox">
       <label for="file">Photo</label>
       <div class="drop" id="drop">
         <strong>Choose a photo</strong> or drop it here<br>JPG, PNG or GIF
@@ -73,13 +97,18 @@
       </div>
       <div class="row tight"><button id="sample" type="button">Try a sample</button></div>
       <div class="picked" id="picked"></div>
+      </div>
 
+      <div id="styleRow">
       <label for="algo">Style</label>
       <select id="algo">
-        <option value="shapes">Shapes</option>
-        <option value="quads">Squares (quadtree)</option>
-        <option value="circles">Circles (quadtree)</option>
+        <option value="shapes">Shapes (best quality, slow)</option>
+        <option value="quads">Squares (fast)</option>
+        <option value="circles">Circles (fast)</option>
+        <option value="triangles">Triangles (fast)</option>
+        <option value="lowpoly">Low-poly triangles (fast)</option>
       </select>
+      </div>
 
       <div id="shapeOnly">
       <label for="shape">Shape</label>
@@ -97,7 +126,7 @@
 
       </div>
 
-      <div class="check" id="outlineRow" hidden><input id="outline" type="checkbox" checked><label for="outline" style="margin:0;color:inherit">Outline each square</label></div>
+      <div class="check" id="outlineRow" hidden><input id="outline" type="checkbox" checked><label for="outline" style="margin:0;color:inherit">Outline each cell</label></div>
 
       <label for="count" id="countLabel">Number of shapes</label>
       <input id="count" type="number" min="10" max="1000" value="150">
@@ -110,6 +139,15 @@
         <option value="512">High (slow)</option>
       </select>
 
+      <label for="palette">Colors (optional)</label>
+      <input id="palette" type="text" placeholder="#000000,#ff0000,#ffffff" autocomplete="off" spellcheck="false">
+
+      <div id="steadyRow" hidden>
+        <label for="steady">Camera steadiness</label>
+        <input id="steady" type="range" min="0" max="90" value="50">
+        <p class="hint">Higher is calmer but trails behind movement.</p>
+      </div>
+
       <div id="shapeOnly2">
       <label for="effort">Search effort</label>
       <select id="effort">
@@ -118,13 +156,10 @@
         <option value="1000,16">Best (slowest)</option>
       </select>
 
-      <label for="palette">Colors (optional)</label>
-      <input id="palette" type="text" placeholder="#000000,#ff0000,#ffffff" autocomplete="off" spellcheck="false">
-
       <div class="check"><input id="edge" type="checkbox"><label for="edge" style="margin:0;color:inherit">Focus shapes on detailed areas</label></div>
       </div>
 
-      <div class="row">
+      <div class="row" id="photoRun">
         <button id="go" class="primary" type="button" disabled>Start</button>
         <button id="reset" type="button" disabled>Reset</button>
       </div>
@@ -141,8 +176,13 @@
         <button id="dlpng" type="button" disabled>Download PNG</button>
         <button id="dlgif" type="button" disabled>Download GIF</button>
       </div>
+      <div class="row" id="camRow" style="justify-content:center" hidden>
+        <button id="rec" type="button">Record a 3 s GIF</button>
+      </div>
+      <video id="video" playsinline muted style="position:fixed;left:-9999px;width:2px;height:2px"></video>
       <p class="hint">Animated SVG: open the file in a browser and the picture builds up one piece at a time. GIF: an animation of the whole build.</p>
     </section>
+  </div>
   </div>
 
   <footer>Based on <a href="https://github.com/fogleman/primitive">primitive</a> by Michael Fogleman (MIT). Fork and source: <a href="https://github.com/loyality7/primitive">loyality7/primitive</a>.</footer>
@@ -163,8 +203,14 @@ let msTotal = 0;
 let leaves = 1;          // quads: squares drawn so far
 let runId = 0;           // changes on every start and reset, so an old loop knows to stop
 let lastDraw = 0;
-const quads = () => $("algo").value !== "shapes"; // squares or circles
-const circles = () => $("algo").value === "circles";
+const quads = () => $("algo").value !== "shapes"; // squares, circles or triangles
+const cell = () => ({ circles: "circle", triangles: "triangle", lowpoly: "lowpoly" })[$("algo").value] || "square";
+let live = null;         // the camera, while it is on
+let livePicture = false; // the canvas shows a picture made from the camera
+let liveId = 0;
+let rec = null;          // a GIF being recorded from the camera
+let mode = null;         // "photo" or "camera", chosen on the start screen
+const ALL_STYLES = [...$("algo").options].map((o) => [o.value, o.text]);
 
 const ctx = $("canvas").getContext("2d");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -191,7 +237,8 @@ function workerMain() { // runs inside every worker, after wasm_exec.js
         return;
       }
       const result = P[fn](...args);
-      postMessage({ id, result }, result instanceof Uint8Array ? [result.buffer] : []);
+      const big = result instanceof Uint8Array ? result : result && result.pixels instanceof Uint8Array ? result.pixels : null;
+      postMessage({ id, result }, big ? [big.buffer] : []);
     } catch (err) {
       postMessage({ id, error: String(err) });
     }
@@ -236,17 +283,25 @@ async function ensureThreads(n) {
 
 // ---- page ----
 function refresh() {
-  $("go").disabled = !ready || !imageBytes || (started && done >= target);
+  $("go").disabled = !ready || !imageBytes || !!live || (started && done >= target);
+  $("cam").disabled = !ready || running;
+  $("cam").textContent = live ? "Stop camera" : "Start camera";
+  $("camRow").hidden = $("steadyRow").hidden = !live;
+  $("rec").disabled = !!rec;
   $("go").textContent = running ? "Pause" : (started && done < target ? "Resume" : "Start");
   $("reset").disabled = !started;
-  const has = started && done > 0;
+  const has = (started && done > 0) || livePicture;
   for (const id of ["dlsvg", "dlanim", "dlpng", "dlgif"]) $(id).disabled = !has;
-  for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "outline", "sample"]) $(id).disabled = started;
+  if (livePicture) $("dlanim").disabled = $("dlgif").disabled = true; // a live picture has no history to animate
+  // a photo run locks its settings; the camera does not: it picks up every change on the next frame
+  for (const id of ["algo", "shape", "count", "detail", "effort", "palette", "edge", "outline"]) $(id).disabled = started;
+  $("sample").disabled = started || !!live;
   $("drop").style.pointerEvents = started ? "none" : "";
   $("drop").style.opacity = started ? .5 : 1;
 }
 
 function status() {
+  if (live) return; // the camera loop writes its own status
   const per = done ? Math.round(msTotal / done) : 0;
   $("progress").style.width = target ? (100 * done / target) + "%" : "0";
   const text = quads()
@@ -267,6 +322,7 @@ async function draw() {
 async function takePhoto(file) {
   setError("");
   imageBytes = new Uint8Array(await file.arrayBuffer());
+  livePicture = false;
   $("picked").textContent = $("picked").title = file.name || "photo";
   const url = URL.createObjectURL(new Blob([imageBytes]));
   const img = new Image();
@@ -283,8 +339,12 @@ async function takePhoto(file) {
 
 async function begin() {
   let r;
-  if (quads()) {
-    r = await pool[0].call("initQuads", imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, circles());
+  livePicture = false;
+  if (cell() === "lowpoly") {
+    r = await pool[0].call("initLowpoly", imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, $("palette").value, Number($("count").value) || 1500);
+    if (!r.error) livePicture = true; // done at once, nothing to animate
+  } else if (quads()) {
+    r = await pool[0].call("initQuads", imageBytes, Number($("detail").value), OUT, $("outline").checked ? 1 : 0, cell(), $("palette").value);
   } else {
     const [cand, rest] = $("effort").value.split(",").map(Number);
     await ensureThreads(THREADS);
@@ -345,6 +405,10 @@ $("go").onclick = async () => {
     $("go").disabled = true; $("status").textContent = "Starting...";
     const ok = await begin();
     if (!ok) { status(); refresh(); return; }
+    if (cell() === "lowpoly") { // a mesh picture is made at once
+      done = target; await draw(); status(); refresh();
+      return;
+    }
   }
   loop();
 };
@@ -385,19 +449,211 @@ $("dlpng").onclick = async () => {
   save("primitive.png", png, "image/png");
 };
 
+// ---- live camera: the real shapes engine, kept alive between frames ----
+// The shapes stay on screen. For every camera frame each copy of the engine
+// recolors all its shapes to fit you, all copies search for one new shape where
+// the picture changed, the best is added to every copy, and the weakest old shapes
+// beyond the number you chose are dropped. The picture follows the camera with a short delay.
+function cameraError(e) {
+  if (["NotAllowedError", "SecurityError"].includes(e.name)) return "The camera was blocked. Allow it for this page in the address bar and try again.";
+  if (["NotFoundError", "OverconstrainedError"].includes(e.name)) return "No camera was found.";
+  if (e.name === "NotReadableError") return "The camera is in use by another app.";
+  return "Could not open the camera: " + (e.message || e.name);
+}
+
+// a change of any of these starts the live picture again from the current frame
+const liveSettings = () => [$("shape").value, $("detail").value, $("effort").value, $("palette").value, $("edge").checked].join("|");
+
+async function startCamera() {
+  setError("");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return setError("This browser cannot open the camera here. It needs https or localhost.");
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+  } catch (e) { return setError(cameraError(e)); }
+  const video = $("video");
+  video.srcObject = stream;
+  await video.play();
+  const work = document.createElement("canvas");
+  runId++; running = false; started = false; livePicture = true; // a photo run cannot go on beside the camera
+  live = { stream, video, work, wctx: work.getContext("2d", { willReadFrequently: true }), fps: 0, id: ++liveId, settings: null, inited: false, each: 1 };
+  refresh();
+  liveLoop(live);
+}
+
+function stopCamera() {
+  if (!live) return;
+  live.stream.getTracks().forEach((t) => t.stop()); // turns the camera light off
+  $("video").srcObject = null;
+  live = null; rec = null;
+  $("status").textContent = "Camera stopped. The last picture is below, you can save it.";
+  refresh();
+}
+
+const nextFrame = (v) => new Promise((r) => v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => r()) : requestAnimationFrame(r));
+
+// the current camera frame at the working size, mirrored like a mirror
+function grabFrame(l) {
+  l.wctx.save(); l.wctx.scale(-1, 1);
+  l.wctx.drawImage(l.video, -l.w, 0, l.w, l.h);
+  l.wctx.restore();
+  return l.wctx.getImageData(0, 0, l.w, l.h).data;
+}
+
+// (re)start every copy of the engine from the current frame with the current settings
+async function restartLive(l) {
+  const sc = Number($("detail").value) / Math.max(l.video.videoWidth, l.video.videoHeight);
+  const w = Math.max(8, Math.round(l.video.videoWidth * sc)), h = Math.max(8, Math.round(l.video.videoHeight * sc));
+  const [cand, rest] = $("effort").value.split(",").map(Number);
+  l.settings = liveSettings();
+  const keep = { w: l.w, h: l.h };
+  l.w = w; l.h = h; l.work.width = w; l.work.height = h;
+  await ensureThreads(THREADS);
+  const data = grabFrame(l);
+  const seed = Math.floor(Math.random() * 1e9);
+  const all = await Promise.all(pool.map((p, i) =>
+    p.call("initFrame", data, w, h, OUT, $("palette").value, $("edge").checked ? 0.6 : 0, cand, rest, seed + i)));
+  if (live !== l) return;
+  const bad = all.find((x) => x.error);
+  if (bad) {
+    if (!l.inited) throw new Error(bad.error);
+    setError(bad.error); // the old settings keep running
+    l.w = keep.w; l.h = keep.h; l.work.width = keep.w; l.work.height = keep.h;
+    return;
+  }
+  setError("");
+  l.inited = true;
+  l.each = Math.max(1, Math.ceil(rest / pool.length)); // restarts each copy takes in a search
+  size = { w, h };
+  $("canvas").width = w; $("canvas").height = h;
+}
+
+async function liveLoop(l) {
+  let last = performance.now();
+  try {
+    while (live === l) {
+      if (l.settings !== liveSettings()) { await restartLive(l); if (live !== l) return; }
+      const data = grabFrame(l);
+      const cap = Math.max(10, Math.min(1000, Number($("count").value) || 120));
+      // 1. every copy takes the new frame and recolors its shapes to fit it
+      const targets = await Promise.all(pool.map((p) => p.call("setTarget", data, Number($("steady").value) / 100)));
+      if (live !== l) return;
+      if (targets.some((t) => t.error)) throw new Error(targets.find((t) => t.error).error);
+      // 2. every copy looks for a new shape, the best one goes into all of them
+      const found = await Promise.all(pool.map((p) => p.call("search", Number($("shape").value), 128, l.each)));
+      if (live !== l) return;
+      if (found.some((f) => f.error)) throw new Error(found.find((f) => f.error).error);
+      const best = found.reduce((a, b) => (b.energy < a.energy ? b : a));
+      const applied = await Promise.all(pool.map((p) => p.call("apply", best.type, best.params, best.alpha, cap)));
+      if (live !== l) return;
+      if (applied.some((a) => a.error)) throw new Error(applied.find((a) => a.error).error);
+      // 3. draw
+      const px = await pool[0].call("shapesPixels");
+      if (live !== l) return;
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, px.length), size.w, size.h), 0, 0);
+      const now = performance.now();
+      l.fps = l.fps ? l.fps * 0.8 + 0.2 * (1000 / (now - last)) : 1000 / (now - last);
+      last = now;
+      $("status").textContent = `Live · ${l.fps.toFixed(0)} updates per second · ${applied[0].shapes} shapes · ${pool.length} threads` +
+        (rec ? ` · recording ${Math.max(0, 3 - (now - rec.t0) / 1000).toFixed(0)} s` : "");
+      if (rec) recordFrame(px, now);
+      await nextFrame(l.video);
+    }
+  } catch (e) {
+    setError(e.message);
+    stopCamera();
+  }
+}
+
+// a 3 second GIF of the live picture: a frame every 80 ms, shown for 8 hundredths of a second each
+function recordFrame(px, now) {
+  if (now - rec.t0 >= rec.frames.length * 80 && rec.frames.length < 38) rec.frames.push(new Uint8Array(px));
+  if (now - rec.t0 < 3000) return;
+  const { frames, w, h } = rec;
+  rec = null;
+  makeGif(frames, w, h);
+}
+async function makeGif(frames, w, h) {
+  const all = new Uint8Array(frames.length * w * h * 4);
+  frames.forEach((f, i) => all.set(f, i * w * h * 4));
+  $("rec").textContent = "Making GIF..."; $("rec").disabled = true;
+  await sleep(30);
+  const gif = await pool[0].call("gifFrames", all, w, h, frames.length, 8, 100);
+  $("rec").textContent = "Record a 3 s GIF"; refresh();
+  if (gif.error) return setError(gif.error);
+  save("primitive-camera.gif", gif, "image/gif");
+}
+$("rec").onclick = () => { if (live && !rec) { rec = { frames: [], t0: performance.now(), w: size.w, h: size.h }; refresh(); } };
+$("cam").onclick = () => (live ? stopCamera() : startCamera());
+
+// ---- the two ways in: a photo or the live camera
+function setStyles(list) {
+  const sel = $("algo"), keep = sel.value;
+  sel.innerHTML = "";
+  for (const [v, t] of list) sel.add(new Option(t, v));
+  sel.value = list.some(([v]) => v === keep) ? keep : list[0][0];
+}
+
+async function enterMode(m) {
+  mode = m;
+  if (m === "photo") stopCamera();
+  const cam = m === "camera";
+  $("home").hidden = true; $("app").hidden = false;
+  $("photoBox").hidden = $("photoRun").hidden = cam;
+  $("camBox").hidden = !cam;
+  $("styleRow").hidden = cam; // the camera uses the real shapes engine, there is no style to pick
+  setStyles(cam ? [["shapes", "Shapes"]] : ALL_STYLES);
+  applyStyle();
+  setError("");
+  if (cam) {
+    $("detail").value = "128"; $("effort").value = "100,3"; $("count").value = 120; // small and quick suits video
+    $("countHint").textContent = "How many shapes stay on screen. Fewer is more abstract, more shows detail.";
+    $("status").textContent = "Starting the camera...";
+    while (!ready) await sleep(50);
+    await startCamera();
+    if (!live) $("status").textContent = "The camera did not start. Press Start camera to try again.";
+  } else {
+    status();
+  }
+  refresh();
+}
+
+function goHome() {
+  stopCamera();
+  runId++; running = false; started = false; done = 0; target = 0;
+  $("home").hidden = false; $("app").hidden = true;
+  $("status").textContent = ready ? "Pick a photo to begin." : "Loading engine...";
+  refresh();
+}
+$("modePhoto").onclick = () => enterMode("photo");
+$("modeCam").onclick = () => enterMode("camera");
+$("back").onclick = goHome;
+
 function applyStyle() {
   const q = quads();
   $("shapeOnly").hidden = $("shapeOnly2").hidden = q;
-  $("outlineRow").hidden = $("algo").value !== "quads";
-  $("countLabel").textContent = q ? "Number of splits" : "Number of shapes";
+  $("outlineRow").hidden = !["quads", "triangles", "lowpoly"].includes($("algo").value); // circles have no outline
+  const low = $("algo").value === "lowpoly";
+  $("countLabel").textContent = low ? "Number of points" : q ? "Number of splits" : "Number of shapes";
   $("count").max = q ? 20000 : 1000;
   $("count").value = q ? 1500 : 150;
-  $("countHint").textContent = q
-    ? "Each split adds three squares. 1000 to 3000 looks good."
+  $("countHint").textContent = low
+    ? "More points make finer triangles. 800 to 3000 looks good."
+    : q
+    ? "Each split adds three cells. 1000 to 3000 looks good."
     : "100 to 200 looks abstract, 400 or more shows detail.";
   refresh();
 }
-$("algo").onchange = applyStyle;
+$("algo").onchange = () => {
+  applyStyle();
+  if (!live) return;
+  if ($("algo").value === "shapes") { // the shapes engine cannot keep up with video: show the nearest live look
+    $("algo").value = "lowpoly"; applyStyle();
+    setError("Shapes need seconds per picture, so live view uses Low-poly triangles. Use Refine with shapes for the real thing.");
+  }
+  live.dirty = true;
+};
+for (const id of ["outline", "palette", "detail"]) $(id).addEventListener("change", () => { if (live) live.dirty = true; });
 
 // photo input: click, drop, sample
 const drop = $("drop"), file = $("file");
